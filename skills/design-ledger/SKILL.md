@@ -179,5 +179,5 @@ design_ledger_update {
 ## 8. 环境基线（本机实测）
 
 - DSH **0.2.0-rc.2**（桌面端 `desktop` profile）
-- 插件版本与 peer 兼容性：本插件 `peerDependencies` 声明了 `dsh-tools` / `schemastery` / `dsh-system-prompt`（`>=0.2.0-rc.1 <0.3.0-0`）。**升级插件时必须钉版本**（`link:` 或带 ref 的 `git+…`），裸 `github:` 会被 pnpm 解析到过期 commit 而静默回退。
+- 插件版本与 peer 兼容性：本插件 `peerDependencies` **只声明真正被 import 的 harness 包**，当前仅 `@deepseek-ai/dsh-tools`（`>=0.2.0-rc.1 <0.3.0-0`，optional）。**不要多声明**：DSH 的兼容性判定会检查每个 `@deepseek-ai/dsh*` peer 与运行时版本，多声明只会增加误判；`cordis` 与会话/提示词等 harness 包都由宿主运行时提供，不经 npm 解析。**升级插件时必须钉版本**（`link:` 或带 ref 的 `git+…`），裸 `github:` 会被 pnpm 解析到过期 commit 而静默回退。
 - 实测数据点：19 个 .md / 588 KB / 226,885 字符 ≈ 133k tokens → 全量注入不可行，本技能的分层策略是必需而非优化。

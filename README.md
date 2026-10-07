@@ -443,7 +443,7 @@ DEVPLAN/
 plugin_manager  install_bundle  target = link:E:\program\dsh\dsh-design-ledger
 ```
 
-> - **link 安装时每个 harness import 都必须被 launcher 路由**，因此本包的 `peerDependencies` **必须**声明所有被 import 的 harness 包（当前只有 `@deepseek-ai/dsh-tools`）。为此本插件**刻意不用 schemastery**——两个标量配置不值得引入一个 harness 依赖。
+> - **link 安装时每个 harness import 都必须被 launcher 路由**，因此本包的 `peerDependencies` **必须**声明所有被 import 的 harness 包 —— 当前**只有 `@deepseek-ai/dsh-tools`**。反过来**也不要多声明**：`cordis`、`dsh-system-prompt`、会话等 harness 包都由 DSH 运行时提供，不经 npm 解析；而 DSH 的兼容性判定会逐个检查 `@deepseek-ai/dsh*` peer，多写只会增加误判风险（例如 `cordis` 在 npm 上根本没有 4.x 正式版，写了就是一条永远无法满足的约束）。同理本插件**刻意不用 schemastery**——两个标量配置不值得引入一个 harness 依赖。
 > - 安装后**必须重开桌面客户端**，bundle 层才会激活（`fiberPhase` 从 `null` 变为 `active`）。
 > - `plugin_manager` 可能报 `application: failed` + `ambiguous-install`；实测这是**假报**（pnpm 退出码 0、磁盘状态正确）。判断是否成功请用 `plugin_manager list_plugins` 看 `fiberPhase`，或看工具是否出现。
 > - profile 的 `package.json` 里还有一份 `dsh.profile.bundles` 列表，bundle **必须同时登记在那里**才能激活。任何 `plugin_manager` 操作都可能重写该文件并丢掉不是它登记的条目——插件"自己消失"时先看这一行。

@@ -1,6 +1,6 @@
 {
   "name": "dsh-design-ledger",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "把设计文档变成可实时更新的开发进度树，并分层注入 DSH 会话上下文，使新会话在大项目上下文耗尽后仍能接上进度。",
   "type": "module",
@@ -57,18 +57,10 @@
     }
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.4",
-    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-system-prompt": ">=0.2.0-rc.1 <0.3.0-0"
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0"
   },
   "peerDependenciesMeta": {
-    "@deepseek-ai/cordis": {
-      "optional": true
-    },
     "@deepseek-ai/dsh-tools": {
-      "optional": true
-    },
-    "@deepseek-ai/dsh-system-prompt": {
       "optional": true
     }
   },

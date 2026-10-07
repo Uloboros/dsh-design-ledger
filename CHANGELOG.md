@@ -3,6 +3,28 @@
 本文件记录对外可见的变更。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.1.1] - 2026-10-07
+
+文档整理与元数据修正。**没有功能变更**，但有一处会实际影响安装的声明修正。
+
+### 修正 Fixed
+
+- **`peerDependencies` 只保留真正被 import 的 harness 包**：原先还声明了
+  `@deepseek-ai/cordis`（`^4.0.4`）与 `@deepseek-ai/dsh-system-prompt`，但代码里
+  **只 import 了 `@deepseek-ai/dsh-tools`**。这两个包由 DSH 运行时提供、不经 npm 解析，
+  而 DSH 的兼容性判定会逐个检查 `@deepseek-ai/*` peer —— 多声明只增加误判风险。
+  尤其 `cordis` 在 npm 上**没有任何 4.x 正式版**（4.x 全是 `4.0.0-rc.x`），
+  `^4.0.4` 是一条永远无法被满足的约束。现已移除，声明与实际依赖一致。
+- 三处文档与 `package.json` 不一致的描述（`SKILL.md` 曾写成声明了 `schemastery`）。
+
+### 变更 Changed
+
+- **README 不再包含维护者发版清单**：移到 [RELEASING.md](RELEASING.md)，
+  两版 README 改为指向它；偏贡献者的探针/校验小节标注为"使用者可跳过"。
+- 新增 `.github/workflows/release.yml`：手动触发的发版流程（跑零依赖校验 → 校验版本一致 →
+  补建 tag → `npm pack` → 断言 tarball 无运行痕迹 → 从 CHANGELOG 抽正文 → 发布 Release 附件）。
+- 新增 `npm run check:release`（发版前自检）与 `npm run audit`（发布审计）。
+
 ## [0.1.0] - 2026-10-06
 
 首个可用版本。**这一版的重点不是功能堆积，而是把三个会静默毁掉功能的契约钉死** ——
@@ -49,4 +71,5 @@
 - **改完插件代码必须整应用重启**：宿主会缓存 ESM 模块，HMR 只更新一部分，不能据此判断结果。
 - 台账记录的是**实际开发**的功能，不是设计文档的清单：要动手做的功能才建节点。
 
+[0.1.1]: https://github.com/Uloboros/dsh-design-ledger/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Uloboros/dsh-design-ledger/releases/tag/v0.1.0
