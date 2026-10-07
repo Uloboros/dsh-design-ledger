@@ -204,6 +204,7 @@ const ALLOWED_TOP = new Set([
   'LICENSE',
   'README.en.md',
   'README.md',
+  'RELEASING.md',
   'client',
   'cordis.patch.yml',
   'lib',
