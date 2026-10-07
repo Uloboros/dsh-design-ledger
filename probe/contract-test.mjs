@@ -22,6 +22,19 @@ import { pathToFileURL } from 'node:url'
 
 const MODULE_URL = pathToFileURL(join(process.cwd(), 'lib', 'index.js')).href
 
+/**
+ * 清理临时工作区，**绝不让清理失败伪装成测试失败**。
+ * Windows 上临时目录偶发 EPERM/ENOTEMPTY（杀软或文件句柄未释放），而 `finally` 里
+ * 抛出的错误会让进程以退出码 1 结束 —— 看起来像断言失败，非常误导（本机踩过）。
+ */
+async function cleanup(dir) {
+  try {
+    await rm(dir, { recursive: true, force: true })
+  } catch (e) {
+    console.log('  ℹ️ 临时目录清理失败（不影响结论）: ' + String((e && e.message) || e))
+  }
+}
+
 /** 记录所有失败的断言。 */
 const failures = []
 function check(name, ok, detail) {
@@ -318,7 +331,7 @@ try {
     check('webServer 就绪后由重试兜底完成注册（3 条）', lateRoutes.length === 3, '实际 ' + lateRoutes.length)
   }
 } finally {
-  await rm(ws1, { recursive: true, force: true })
+  await cleanup()
 }
 
 // ── 场景 2：无台账（注入文本必须退化为 ''，仍然不能抛） ──
@@ -342,7 +355,7 @@ try {
     })())
   }
 } finally {
-  await rm(ws2, { recursive: true, force: true })
+  await cleanup()
 }
 
 // ── 场景 3：台账 JSON 损坏（读盘抛错也必须退化为字符串） ──
@@ -367,7 +380,7 @@ try {
     })())
   }
 } finally {
-  await rm(ws3, { recursive: true, force: true })
+  await cleanup()
 }
 
 // ── 场景 4：webServer 尚未就绪（注入回调暂时不触发） ──
@@ -385,7 +398,7 @@ try {
   const section = env.sections.find((s) => s.name === 'design-ledger')
   check('段落仍注册（与路由解耦）', !!section)
 } finally {
-  await rm(ws4, { recursive: true, force: true })
+  await cleanup()
 }
 
 console.log('\n' + (failures.length === 0 ? '全部通过 ✅' : '失败 ' + failures.length + ' 项 ❌：' + failures.join(' | ')))

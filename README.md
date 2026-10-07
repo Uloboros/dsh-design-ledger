@@ -479,6 +479,7 @@ dsh-design-ledger/
     ├── panel-list-test.mjs     # ⭐ 面板取数：会话工作区解析 + 越界拒绝
     ├── table-tree.mjs          # ⭐ 功能表行 → 功能节点（真实设计文档，只读）
     ├── readme-check.mjs        # 两版 README 体检：结构对齐 / 围栏成对 / 链接可解析（npm run check:readme）
+    ├── publish-audit.mjs       # 发布审计：与 GitHub 逐文件比对（Git blob 哈希）+ 隐私体检（npm run audit）
     ├── reorder-crashes.mjs     # 维护脚本：把「崩溃 N」小节重排为升序（发布前跑一次）
     ├── host-smoke.mjs          # 宿主端到端（假 ctx 跑完整流程）
     ├── route-test.mjs          # 路由行为与路径安全

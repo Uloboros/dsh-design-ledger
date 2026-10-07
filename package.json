@@ -30,14 +30,14 @@
     "progress-ledger",
     "context"
   ],
-  "//": "↓↓↓ 把下面的 <your-github-username> 全部替换成你的 GitHub 用户名（共 3 处），然后删掉本行注释 ↓↓↓",
+  "//": "仓库元数据：若 fork 到别处，请把下面三处 URL 换成你自己的仓库地址",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/<your-github-username>/dsh-design-ledger.git"
+    "url": "git+https://github.com/Uloboros/dsh-design-ledger.git"
   },
-  "homepage": "https://github.com/<your-github-username>/dsh-design-ledger#readme",
+  "homepage": "https://github.com/Uloboros/dsh-design-ledger#readme",
   "bugs": {
-    "url": "https://github.com/<your-github-username>/dsh-design-ledger/issues"
+    "url": "https://github.com/Uloboros/dsh-design-ledger/issues"
   },
   "author": "Uloboros",
   "license": "MIT",
@@ -78,6 +78,7 @@
     "contract": "node --import ./probe/register.mjs probe/contract-test.mjs",
     "probe:panel": "node --import ./probe/register.mjs probe/panel-list-test.mjs .",
     "probe:tree": "node --import ./probe/register.mjs probe/table-tree.mjs",
+    "audit": "node probe/publish-audit.mjs",
     "verify": "npm run check && npm test && npm run check:readme && npm run contract"
   }
 }

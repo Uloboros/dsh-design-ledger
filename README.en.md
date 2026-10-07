@@ -434,6 +434,7 @@ dsh-design-ledger/
     ├── panel-list-test.mjs     # ⭐ panel data: session workspace resolution + out-of-bounds rejection
     ├── table-tree.mjs          # ⭐ table rows → feature nodes (real design docs, read-only)
     ├── readme-check.mjs        # README health check: structure / fences / links (npm run check:readme)
+    ├── publish-audit.mjs       # publish audit: file-by-file comparison against GitHub (blob hashes) + privacy sweep (npm run audit)
     ├── reorder-crashes.mjs     # maintenance: reorder "Crash N" sections ascending (run before a release)
     ├── host-smoke.mjs          # host end-to-end (fake ctx, full flow)
     ├── route-test.mjs          # route behaviour and path safety

@@ -8,11 +8,14 @@
  */
 import { mkdtemp, rm, cp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const DESIGN_SRC = process.argv[2]
-const plugin = await import(pathToFileURL('E:\\program\\dsh\\dsh-design-ledger\\lib\\index.js').href)
+
+/** 插件根目录（本文件在 <plugin>/probe/ 下）—— 不写死机器路径，任何 clone 位置都能跑。 */
+const PLUGIN = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const plugin = await import(pathToFileURL(join(PLUGIN, 'lib', 'index.js')).href)
 
 const routes = []
 const tools = new Map()
@@ -159,5 +162,11 @@ try {
   console.log('  含任务提示词 =', String(text).includes('任务开启提示词'))
   console.log('  含系统名 =', String(text).includes('核心玩法系统'))
 } finally {
-  await rm(ws, { recursive: true, force: true })
+  // 清理失败**不能**影响结论：Windows 上临时目录偶发 EPERM/ENOTEMPTY（杀软或文件句柄未释放），
+  // 而 finally 里抛出的错误会直接让进程以退出码 1 结束，看起来像"测试失败"，非常误导。
+  try {
+    await rm(ws, { recursive: true, force: true })
+  } catch (e) {
+    console.log('  ℹ️ 临时目录清理失败（不影响上面的结论）: ' + String((e && e.message) || e))
+  }
 }

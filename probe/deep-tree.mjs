@@ -14,14 +14,17 @@
  */
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+/** 插件根目录（本文件在 <plugin>/probe/ 下）—— 不写死机器路径。 */
+const PLUGIN = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const { scanDesignDocs, classifyDirName } = await import(
-  pathToFileURL('E:\\program\\dsh\\dsh-design-ledger\\lib\\design-doc.js').href
+  pathToFileURL(join(PLUGIN, 'lib', 'design-doc.js')).href
 )
 const { buildLedgerFromScan, countSubtree } = await import(
-  pathToFileURL('E:\\program\\dsh\\dsh-design-ledger\\lib\\ledger.js').href
+  pathToFileURL(join(PLUGIN, 'lib', 'ledger.js')).href
 )
 
 console.log('=== 目录名推断（深层）===')
@@ -74,5 +77,11 @@ try {
   const hitbox = [...sys.values()].find((n) => n.name === '命中判定')
   console.log('  「命中判定」存在 =', !!hitbox, '| 其父 =', hitbox ? sys.get(hitbox.parentId)?.name : 'n/a')
 } finally {
-  await rm(root, { recursive: true, force: true })
+  // 清理失败不影响结论：Windows 上临时目录偶发 EPERM/ENOTEMPTY，
+  // 在 finally 里抛出会让进程以退出码 1 结束，看起来像"测试失败"（本机踩过）。
+  try {
+    await rm(root, { recursive: true, force: true })
+  } catch (e) {
+    console.log('  ℹ️ 临时目录清理失败（不影响上面的结论）: ' + String((e && e.message) || e))
+  }
 }

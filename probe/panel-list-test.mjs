@@ -20,7 +20,14 @@ import { join } from 'node:path'
 
 /** 会话工作区（真实待浏览目录）。 */
 const WS = process.argv[2] || process.cwd()
-/** 模拟部署默认根（本机实测就是 profile 目录）。 */
+/**
+ * 模拟宿主 sandboxPolicy 在**无 session** 时的缺省解析。
+ *
+ * 注意这是**测试夹具**，故意写成本机实测到的那个 profile 目录 —— 要复现的正是
+ * "面板把部署默认根当成工作区"这个现象。它不是隐私泄漏，也不是可移植性缺陷：
+ * 任何值都能验证同一条逻辑（`isDeploymentRoot` 按结构识别，不看具体盘符）。
+ * 换机器复现时，把它改成本机实际的 profile 目录即可。
+ */
 const DEPLOY_ROOT = 'D:\\AppData\\.dsh\\profiles\\desktop'
 
 const mod = await import(pathToFileURL(join(process.cwd(), 'lib', 'index.js')).href)

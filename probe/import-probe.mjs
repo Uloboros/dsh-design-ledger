@@ -1,11 +1,16 @@
 /**
  * 尝试 import 插件入口，打印真实错误（含堆栈）。
  * 目的：拿到 DSH "failed to import" 背后的确切原因。
+ *
+ * 路径**按本脚本位置解析**（不写死机器路径），这样在任何 clone 位置都能跑。
  */
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 import { readdirSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 
-const entry = 'E:\\program\\dsh\\dsh-design-ledger\\lib\\index.js'
+/** 插件根目录（本文件在 <plugin>/probe/ 下）。 */
+const PLUGIN = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const entry = join(PLUGIN, 'lib', 'index.js')
 
 try {
   const mod = await import(pathToFileURL(entry).href)
@@ -25,7 +30,7 @@ try {
 
 // 顺便看看 link 安装后插件目录里有没有 node_modules
 try {
-  const nm = readdirSync('E:\\program\\dsh\\dsh-design-ledger')
+  const nm = readdirSync(PLUGIN)
   console.log('\n插件目录条目:', nm.join(', '))
 } catch (e) {
   console.log('读取插件目录失败:', e.message)

@@ -10,13 +10,15 @@
  */
 import { mkdtemp, rm, cp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const DESIGN_SRC = process.argv[2]
 const WS_RO = process.argv[3]
 
-const plugin = await import(pathToFileURL('E:\\program\\dsh\\dsh-design-ledger\\lib\\index.js').href)
+/** 插件根目录（本文件在 <plugin>/probe/ 下）—— 不写死机器路径，任何 clone 位置都能跑。 */
+const PLUGIN = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const plugin = await import(pathToFileURL(join(PLUGIN, 'lib', 'index.js')).href)
 
 // ── 假 ctx ──
 const registeredTools = new Map()
@@ -174,5 +176,10 @@ try {
     console.log('  前 200 字符:', String(doc.text || '').slice(0, 200).replace(/\n/g, ' ⏎ '))
   }
 } finally {
-  await rm(ws, { recursive: true, force: true })
+  // 同上：清理失败不该伪装成测试失败（Windows 临时目录偶发 EPERM）。
+  try {
+    await rm(ws, { recursive: true, force: true })
+  } catch (e) {
+    console.log('  ℹ️ 临时目录清理失败（不影响上面的结论）: ' + String((e && e.message) || e))
+  }
 }
