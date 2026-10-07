@@ -105,21 +105,42 @@ window.__ModuleLoader__.load({
       bindOk: 'Ledger created',
     }
 
+    /**
+     * 面板样式。
+     *
+     * ⚠️ **按钮配色必须用官方 token，不能自创**。这里曾经踩过两个坑：
+     *
+     *  1. hover 底色用了 `--dsw-alias-bg-layer-2` —— 而它在**浅色主题下就是纯白**
+     *     （实测定义：浅色 `var(--dsw-static-neutral-bluish-00)` = `#fff`，深色 `-850`）。
+     *  2. 主按钮的底色/文字是硬编码的（brand 背景 + `color:#fff`），
+     *     而 `.dlg-btn:hover` 与 `.dlg-primary` **特异性相同(0,2,0)**，后者写在后面才勉强压住；
+     *     一旦 hover 规则生效覆盖底色，就变成"白底白字"，字直接看不见。
+     *
+     * 正确做法照抄 `@deepseek-ai/dsh-client-ui-primitives` 的 `Button.module.css`：
+     *   普通/描边按钮 hover → `--dsw-alias-interactive-bg-hover`（带透明度的中性色，两种主题都安全）
+     *   主按钮              → `--dsw-alias-button-primary-fill` / `-hover` + `--dsw-alias-label-primary-foreground`
+     *   描边                → `--dsw-alias-border-l3`
+     * 并用 `:not(:disabled)` + 显式 `:hover` 变体避免"禁用态也变色"和特异性打架。
+     */
     const CSS = [
       '.dlg-root{padding:16px 20px;font-size:13px;line-height:1.6;color:var(--dsw-alias-label-primary,inherit);max-width:960px}',
       '.dlg-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}',
       '.dlg-title{font-size:15px;font-weight:600;margin:0}',
-      '.dlg-btn{border:1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.35));background:transparent;color:inherit;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:12px}',
-      '.dlg-btn:hover{background:var(--dsw-alias-bg-layer-2,rgba(128,128,128,.12))}',
-      '.dlg-btn[disabled]{opacity:.5;cursor:default}',
-      '.dlg-primary{border-color:transparent;background:var(--dsw-alias-brand-primary,#4d6bfe);color:#fff}',
+      // 描边按钮（= 官方 outline 变体）
+      '.dlg-btn{border:1px solid var(--dsw-alias-border-l3,var(--dsw-alias-border-l1,rgba(128,128,128,.35)));background:transparent;color:var(--dsw-alias-label-primary,inherit);border-radius:var(--dsw-radius-sm,6px);padding:3px 10px;cursor:pointer;font-size:12px}',
+      '.dlg-btn:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.12))}',
+      '.dlg-btn[disabled]{opacity:.4;cursor:not-allowed}',
+      // 主按钮（= 官方 primary 变体）：底色/文字/hover 全部走官方 token，两主题自适应
+      '.dlg-primary{border-color:transparent;background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4d6bfe));color:var(--dsw-alias-label-primary-foreground,#fff)}',
+      '.dlg-primary:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover,var(--dsw-alias-brand-primary,#4d6bfe))}',
       '.dlg-card{border:1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.25));border-radius:8px;padding:10px 12px;margin:8px 0}',
       '.dlg-kv{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}',
       '.dlg-sys{display:flex;align-items:center;gap:8px;padding:3px 0}',
+      // 列表行的选中/悬停：同样不能用 bg-layer-2（浅色下是纯白，白底白字）
       '.dlg-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:5px;cursor:pointer}',
-      '.dlg-row:hover{background:var(--dsw-alias-bg-layer-2,rgba(128,128,128,.12))}',
-      '.dlg-row.sel{background:var(--dsw-alias-bg-layer-2,rgba(77,107,254,.18))}',
-      '.dlg-bar{flex:1;height:6px;border-radius:3px;background:var(--dsw-alias-bg-base,rgba(128,128,128,.2));overflow:hidden;min-width:80px}',
+      '.dlg-row:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.12))}',
+      '.dlg-row.sel{background:var(--dsw-alias-interactive-bg-hover,rgba(77,107,254,.18));box-shadow:inset 0 0 0 1px var(--dsw-alias-brand-primary,#4d6bfe)}',
+      '.dlg-bar{flex:1;height:6px;border-radius:3px;background:var(--dsw-alias-border-l1,rgba(128,128,128,.2));overflow:hidden;min-width:80px}',
       '.dlg-bar>i{display:block;height:100%;background:currentColor;opacity:.55}',
       '.dlg-dim{opacity:.65}',
       '.dlg-code{font-family:ui-monospace,Consolas,monospace;font-size:12px;opacity:.9;word-break:break-all}',
@@ -405,7 +426,24 @@ window.__ModuleLoader__.load({
 
     /** 主面板。 */
     function LedgerPanel(props) {
-      const t = (k) => ((props && props.t ? props.t(k) : undefined) ?? zh[k] ?? k)
+      /**
+       * 翻译。
+       *
+       * `props.t` 是渲染器注入的**响应式**席位（槽位声明 `locale: LOCALE_NS` 后由
+       * `localeSeat(face, ns)` 提供，并用 `useLocaleRevision()` 订阅 revision），
+       * 所以语言切换会自定重渲染。
+       *
+       * 但字典查找失败时框架的 `t` **返回 key 本身**（不是 undefined），若直接用它就会
+       * 把界面卡在"显示 key"或回退不掉；因此这里只在"查不到"时才落到本地字典，
+       * 并且**必须先转成字符串**再比较 —— 可选链可能给出 undefined。
+       */
+      const localT = (k) => zh[k] ?? k
+      const t = (k) => {
+        const fromSeat = props && typeof props.t === 'function' ? props.t(k) : undefined
+        const text = typeof fromSeat === 'string' ? fromSeat : ''
+        // 空串或与 key 相同（= 未注册/查不到）→ 用本地字典兜底
+        return text.length > 0 && text !== k ? text : localT(k)
+      }
       const [state, setState] = React.useState({ phase: 'loading', data: null, error: null })
       const [picking, setPicking] = React.useState(false)
 
@@ -595,6 +633,15 @@ window.__ModuleLoader__.load({
         // ── 槽位注册 ──
         // 每处单独 try/catch：**任何一处失败都不能让 apply() 抛出**，否则会
         // 连带把宿主的客户端插件树（含 dsh-client-ui-sidebar）拖垮。
+        //
+        // 语言接线（关键）：
+        //   · 槽位声明 `locale: LOCALE_NS` → 渲染器 `standardKit()` 会注入
+        //     `kit["t"] = localeSeat(face, entry.locale)`，并用 `useLocaleRevision()`
+        //     订阅 revision 自动重渲染。**所以组件的 props.t 是响应式的**，
+        //     切换语言立刻生效，不需要自己订阅。
+        //   · 因此**不能**再自己 `inject: () => ({ t })`：渲染器的
+        //     `assertNoPropOverlap()` 见到重复 prop 会抛 SlotAssemblyError，
+        //     那是装配期错误，会让整个条目激活失败。
         try {
           ctx.slots.inject('sidebar.panellist', () =>
             ctx.slots.register(
@@ -603,6 +650,10 @@ window.__ModuleLoader__.load({
                 id: PANEL_ID,
                 // order 2：排在宿主「插件」(0) 与 skill-mcp-panel「技能/MCP」(1) 之后
                 order: 2,
+                locale: LOCALE_NS,
+                // label 由**侧栏**读取：它在每次语言变化时用
+                // `ctx.locale.subscribe(syncPanels)` 重新解析所有标签，
+                // 所以这里只要返回"当前语言下的文案"即可自动跟随。
                 label: () => t('nav'),
               },
               PanelIcon,
@@ -618,7 +669,7 @@ window.__ModuleLoader__.load({
               {
                 name: 'main',
                 key: PANEL_ID,
-                inject: () => ({ t }),
+                locale: LOCALE_NS,
               },
               LedgerPanel,
             ),

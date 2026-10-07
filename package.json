@@ -75,10 +75,11 @@
     "test": "node --test test/core.test.js test/agents-md.test.js",
     "check": "node --check lib/index.js && node --check lib/design-doc.js && node --check lib/ledger.js && node --check lib/inject.js && node --check lib/agents-md.js && node --check client/client.js",
     "check:readme": "node probe/readme-check.mjs",
+    "check:client": "node probe/client-ui-test.mjs",
     "contract": "node --import ./probe/register.mjs probe/contract-test.mjs",
     "probe:panel": "node --import ./probe/register.mjs probe/panel-list-test.mjs .",
     "probe:tree": "node --import ./probe/register.mjs probe/table-tree.mjs",
     "audit": "node probe/publish-audit.mjs",
-    "verify": "npm run check && npm test && npm run check:readme && npm run contract"
+    "verify": "npm run check && npm test && npm run check:readme && npm run check:client && npm run contract"
   }
 }

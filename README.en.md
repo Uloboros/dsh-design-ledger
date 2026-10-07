@@ -140,26 +140,45 @@ There is **no `method` field**. Writing `{ method: 'GET', path, handler }` makes
 ctx.inject(['webServer'], (sctx) => sctx.webServer.register({ kind: 'exact', path, handler }))
 ```
 
-### Crash 4: the panel referenced theme variables that do not exist → everything fell back to hardcoded dark colours
+### Crash 4: inventing theme tokens → unreadable dark panel / white-on-white hover
 
-**Symptom**: the modal was "too dark, text unreadable" in a light theme.
+**Symptoms (twice, same root cause)**:
 
-**Mechanism**: names like `--dsw-alias-bg-1` / `--dsw-alias-text-1` **do not exist** in DSH, so the CSS always took the hardcoded fallback (`#1b1d22`) and went black-on-black in light mode.
+1. the modal was "too dark, text unreadable" in a light theme;
+2. **hovering "Choose design document" / "Load as design document" turned the background white while the text stayed white — the label vanished.**
 
-**Real tokens** (read live via client `Theme.listTokens`):
+**Mechanism**: colour tokens must be copied from official components; guessing by name does not work. Both incidents came from that:
 
-| Purpose | Real variable |
+| What this plugin wrote | Reality |
 |---|---|
-| App background | `--dsw-alias-bg-base` |
-| Raised surface 1 / 2 | `--dsw-alias-bg-layer-1` / `-layer-2` |
-| Overlay (modal) | `--dsw-alias-bg-overlay` |
-| Borders | `--dsw-alias-border-l1` / `-l2` |
-| Brand accent | `--dsw-alias-brand-primary` |
-| Primary / secondary text | `--dsw-alias-label-primary` / `-secondary` |
-| State colours | `--dsw-alias-state-warn-primary` / `-error-primary` / `-success-primary` / `-idle-primary` |
-| Sidebar fill | `--dsw-specific-sidebar-fill` |
+| `--dsw-alias-bg-1` / `--dsw-alias-text-1` | **do not exist** in DSH → the hardcoded dark fallback always won |
+| `--dsw-alias-bg-layer-2` as a hover surface | exists, but in a **light theme it is pure white** (measured: `var(--dsw-static-neutral-bluish-00)` = `#fff`) |
 
-Always reference real tokens; keep fallbacks only as a last resort.
+The second one was compounded by a cascade problem: `.dlg-btn:hover` and `.dlg-primary` have the **same specificity (0,2,0)**, and the primary button hardcoded its own background/text (brand fill + `color:#fff`); once the hover rule overrode the background it became white background + white text.
+
+**The correct source**: don't guess — read the official component CSS. `Button.module.css` in `@deepseek-ai/dsh-client-ui-primitives` is authoritative:
+
+```css
+.primary            { background: var(--dsw-alias-button-primary-fill);   color: var(--dsw-alias-label-primary-foreground); }
+.primary:hover      { background: var(--dsw-alias-button-primary-hover); }
+.ghost:hover        { background: var(--dsw-alias-interactive-bg-hover); }
+.outline            { border: 0.5px solid var(--dsw-alias-border-l3); }
+.outline:hover      { background: var(--dsw-alias-interactive-bg-hover); }
+```
+
+**Key values** (real definitions read from the theme CSS):
+
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `--dsw-alias-interactive-bg-hover` | `#2631480f` | `#ffffff14` | **the default interactive surface** (translucent, safe in both themes) |
+| `--dsw-alias-button-primary-fill` | `var(--dsw-alias-brand-primary)` | same | primary button fill |
+| `--dsw-alias-button-primary-hover` | `var(--dsw-static-neutral-bluish-750)` | `…-100` | primary hover (**its own rule**) |
+| `--dsw-alias-label-primary-foreground` | `#fff` | `#0f1115` | primary button label |
+| `--dsw-alias-bg-layer-2` | **`#fff`** | `#2b2b2b` | a raised surface — **never an interactive surface** |
+
+**Rule**: interactive backgrounds always use `--dsw-alias-interactive-bg-hover`; primary buttons use the button-primary trio; every hover is written `:hover:not(:disabled)`. `npm run check:client` asserts all of this so it cannot regress.
+
+> **`Theme.listTokens` only lists 14 tokens — it is a subset** and does not include the button/interactive families used above. So pick tokens from official component CSS, not from that inspect list alone.
 
 ### Crash 5 (worst): a non-string `systemPrompt` section text → **every message fails instantly**
 
@@ -233,14 +252,19 @@ Because the plugin wrapped construction errors into "skip this tool", the result
 ### Verification order when changing this plugin (no DSH restart needed)
 
 ```powershell
+npm run verify                                                            # syntax + unit tests + docs check + client check + contract (one command)
 node --import ./probe/register.mjs probe/import-probe.mjs                 # does it import?
 npm test                                                                  # 13 unit tests
+node probe/client-ui-test.mjs                                             # ⭐ client UI: button contrast / dictionary completeness / locale wiring (no DSH needed)
 node --import ./probe/register.mjs probe/contract-test.mjs                # ⭐ contract self-check (crashes 5/6 + route registration)
 node --import ./probe/register.mjs probe/panel-list-test.mjs <workspace>  # ⭐ panel data (crash 7 + out-of-bounds rejection)
 node --import ./probe/register.mjs probe/table-tree.mjs <design-doc>      # ⭐ table rows → feature nodes (read-only)
 node --import ./probe/register.mjs probe/host-smoke.mjs <design-doc> <workspace>  # host end-to-end
 node --import ./probe/register.mjs probe/route-test.mjs <design-doc>      # routes and path safety
 ```
+
+`probe/client-ui-test.mjs` and `probe/readme-check.mjs` are **zero-dependency** (Node only), so they also run in CI;
+the remaining probes need this machine's DSH dependency layer and are local-only.
 
 `probe/contract-test.mjs` is the **regression guard** that pins down the contracts which silently destroy functionality:
 
@@ -251,6 +275,42 @@ node --import ./probe/register.mjs probe/route-test.mjs <design-doc>      # rout
 | `ctx.inject(['webServer'])` registers 3 routes; no false positive when the service is not ready, retry covers it once it is | Panel `Unexpected end of JSON input` |
 | Once the session workspace is known, `list`/`status` use it; deployment root / out-of-bounds / `node_modules` always 400 | Crash 7 (empty dialog + root you cannot leave) |
 | With no ledger / a corrupt ledger JSON, injection degrades to `''` and never throws | Edge cases of crash 5 |
+
+`probe/client-ui-test.mjs` guards the **UI** side:
+
+| Assertion | What it prevents |
+|---|---|
+| Interactive surfaces never use `--dsw-alias-bg-layer-2` (pure white in a light theme) | white-on-white hover |
+| Ghost/list hover uses `--dsw-alias-interactive-bg-hover` | same |
+| Primary buttons use the button-primary trio, with their own hover rule | primary label vanishing on hover |
+| The primary label is no longer a hardcoded `#fff` | contrast mismatch across themes |
+| `zh` / `en` key sets match, and every key used in code has both | raw keys leaking into the UI |
+| Slots declare the `locale` namespace and no longer self-inject `t` | language not following DSH + duplicate prop failing slot assembly |
+
+## UI language (i18n)
+
+Panel copy **follows the DSH language setting** (DSH's built-in locale ids are only `zh` and `en`):
+
+```js
+// 1) register both dictionaries (one call covers every built-in locale)
+ctx.effect(() => ctx.locale.register(LOCALE_NS, { zh, en }), 'design-ledger: dictionaries')
+
+// 2) declare the locale namespace on the slot → the renderer injects a REACTIVE t seat
+ctx.slots.register({ name: 'main', key: PANEL_ID, locale: LOCALE_NS }, LedgerPanel)
+```
+
+The mechanics below were read out of the sources, not guessed:
+
+- The renderer's `standardKit()` runs `kit["t"] = localeSeat(face, entry.locale)` whenever
+  `entry.locale !== undefined`, and subscribes via `useLocaleRevision()` — so **`props.t` inside a component
+  is reactive out of the box and a language switch re-renders immediately**; the plugin need not subscribe itself.
+- **Therefore never `inject: () => ({ t })` yourself**: the renderer's `assertNoPropOverlap()` throws a
+  `SlotAssemblyError` on a duplicate prop, which is an assembly-time error that fails the whole entry.
+- The sidebar button text (`label`) is read by **the sidebar**, which re-resolves every panel label on each
+  locale change via `ctx.locale.subscribe(syncPanels)` — so a `label` that returns "the text for the current
+  locale" follows automatically, with no extra notification.
+- When a lookup fails, the framework's `t` **returns the key itself** (not `undefined`), so any local
+  fallback must first test "is this equal to the key".
 
 ## Design document parsing rules
 
@@ -434,6 +494,7 @@ dsh-design-ledger/
     ├── panel-list-test.mjs     # ⭐ panel data: session workspace resolution + out-of-bounds rejection
     ├── table-tree.mjs          # ⭐ table rows → feature nodes (real design docs, read-only)
     ├── readme-check.mjs        # README health check: structure / fences / links (npm run check:readme)
+    ├── client-ui-test.mjs      # client UI check: button contrast tokens / dictionary completeness / locale wiring (npm run check:client)
     ├── publish-audit.mjs       # publish audit: file-by-file comparison against GitHub (blob hashes) + privacy sweep (npm run audit)
     ├── reorder-crashes.mjs     # maintenance: reorder "Crash N" sections ascending (run before a release)
     ├── host-smoke.mjs          # host end-to-end (fake ctx, full flow)

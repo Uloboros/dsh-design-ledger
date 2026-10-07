@@ -151,26 +151,51 @@ root.inject(['webServer', 'credentials', 'connection'], (ctx) => {
 - `probe/route-test.mjs` 加了**契约自检**（断言每条路由 `kind` 合法），缺 `kind` 时以非零码退出；
 - 注册的三种结局都会打一条 `[design-ledger]` 日志：`panel routes registered: 3 (…)` / `ROUTE REGISTRATION FAILED: <stack>` / `webServer unavailable; panel routes NOT registered`。宿主不把 `console.warn` 落盘，所以排障时要看**应用终端/控制台**。
 
-### 崩溃 4（不死但难看）：面板引用了不存在的主题变量 → 全部回退成硬编码深色
+### 崩溃 4：面板配色自创 token → 黑底看不清 / hover 白底白字
 
-**症状**：弹出窗口"太黑、看不清上面的字"。
+**症状（两次，同一个根因）**：
 
-**机制**：我写的是 `var(--dsw-alias-bg-1, #1b1d22)`、`var(--dsw-alias-text-1, inherit)` 这类变量 —— **这些名字在 DSH 里不存在**，于是**永远走 fallback**（硬编码的 `#1b1d22`），浅色主题下自然成了黑底看不清字。
+1. 弹窗"太黑、看不清上面的字"（浅色主题下）；
+2. **鼠标移到「选择设计文档」「载入为设计文档」上时，背景变白、字也是白的，字直接消失**。
 
-**真实 token**（用 client `Theme.listTokens` 取到，共 14 个）：
+**机制**：颜色 token 必须照抄官方组件，不能凭名字猜。两次都栽在这上面：
 
-| 用途 | 真实变量 |
+| 我写的 | 真实情况 |
 |---|---|
-| 应用底色 | `--dsw-alias-bg-base` |
-| 一级 / 二级抬升面 | `--dsw-alias-bg-layer-1` / `-layer-2` |
-| 浮层（模态首选） | `--dsw-alias-bg-overlay` |
-| 边框 | `--dsw-alias-border-l1` / `-l2` |
-| 品牌强调 | `--dsw-alias-brand-primary` |
-| 主 / 次文字 | `--dsw-alias-label-primary` / `--dsw-alias-label-secondary` |
-| 状态色 | `--dsw-alias-state-warn-primary` / `-error-primary` / `-success-primary` / `-idle-primary` |
-| 侧栏底色 | `--dsw-specific-sidebar-fill` |
+| `--dsw-alias-bg-1` / `--dsw-alias-text-1` | **DSH 里不存在** → 永远走 fallback 的硬编码深色 |
+| `--dsw-alias-bg-layer-2` 当 hover 底色 | 存在，但**浅色主题下就是纯白**（实测 `var(--dsw-static-neutral-bluish-00)` = `#fff`） |
 
-**做法**：颜色一律引用上述真实 token；fallback 只当最后的保险，**不要当默认值**。
+第二个还叠加了一个 CSS 层叠问题：`.dlg-btn:hover` 与 `.dlg-primary` **特异性相同 (0,2,0)**，
+主按钮的底色/文字又是硬编码的（brand 底 + `color:#fff`）；hover 规则一覆盖底色，
+就成了"白色背景 + 白色文字"，字彻底看不见。
+
+**正确来源**：不要去猜，直接读官方组件的 CSS ——
+`@deepseek-ai/dsh-client-ui-primitives` 的 `Button.module.css` 就是权威：
+
+```css
+.primary            { background: var(--dsw-alias-button-primary-fill);   color: var(--dsw-alias-label-primary-foreground); }
+.primary:hover      { background: var(--dsw-alias-button-primary-hover); }
+.ghost:hover        { background: var(--dsw-alias-interactive-bg-hover); }
+.outline            { border: 0.5px solid var(--dsw-alias-border-l3); }
+.outline:hover      { background: var(--dsw-alias-interactive-bg-hover); }
+```
+
+**关键取值**（从主题 CSS 里读出来的真实定义）：
+
+| token | 浅色 | 深色 | 用途 |
+|---|---|---|---|
+| `--dsw-alias-interactive-bg-hover` | `#2631480f` | `#ffffff14` | **交互底色首选**（带透明度，两种主题都安全） |
+| `--dsw-alias-button-primary-fill` | `var(--dsw-alias-brand-primary)` | 同 | 主按钮底色 |
+| `--dsw-alias-button-primary-hover` | `var(--dsw-static-neutral-bluish-750)` | `…-100` | 主按钮 hover（**有独立规则**） |
+| `--dsw-alias-label-primary-foreground` | `#fff` | `#0f1115` | 主按钮文字 |
+| `--dsw-alias-bg-layer-2` | **`#fff`** | `#2b2b2b` | 抬升面 —— **不要拿它当 hover 底色** |
+
+**做法**：交互底色一律用 `--dsw-alias-interactive-bg-hover`；主按钮用 button-primary 三件套；
+hover 一律写 `:hover:not(:disabled)`（避免禁用态变色、也顺手规避层叠打架）。
+`npm run check:client` 会断言这些约定，防止再犯。
+
+> **`Theme.listTokens` 只列出 14 个 token，是子集**，不含上面用到的 button/interactive 系列 ——
+> 所以"用什么 token"要以官方组件 CSS 为准，别只看 inspect 列表。
 
 ### 崩溃 5（最严重）：`systemPrompt` 段落文本返回非字符串 → **整个对话一按发送就失败**
 
@@ -268,14 +293,19 @@ parameters: { type: 'object', properties: { rel: {...} } }
 ### 改这个插件时的验证顺序（不必重启 DSH）
 
 ```powershell
-node --import ./probe/register.mjs probe/import-probe.mjs                                    # 能 import 吗
-node --test 'test/*.test.js'                                                                  # 11 个单测
+npm run verify                                                                                # 语法 + 单测 + 文档体检 + 客户端体检 + 契约自检（推荐，一条命令跑完）
+node --import ./probe/register.mjs probe/import-probe.mjs                                     # 能 import 吗
+node --test test/core.test.js test/agents-md.test.js                                          # 13 个单测
+node probe/client-ui-test.mjs                                                                 # ⭐ 客户端：按钮对比度 / 字典完整性 / 语言接线（不需要 DSH）
 node --import ./probe/register.mjs probe/contract-test.mjs                                    # ⭐ 契约自检（崩溃 5/6 + 路由注册）
 node --import ./probe/register.mjs probe/panel-list-test.mjs <工作区>                          # ⭐ 面板取数（崩溃 7 + 越界拒绝）
 node --import ./probe/register.mjs probe/table-tree.mjs <设计文档>                             # ⭐ 方案 A：表格行 → 功能节点（只读）
 node --import ./probe/register.mjs probe/host-smoke.mjs <设计文档> <工作区>                    # 宿主端到端
 node --import ./probe/register.mjs probe/route-test.mjs <设计文档>                             # 路由与路径安全
 ```
+
+`probe/client-ui-test.mjs` 与 `probe/readme-check.mjs` **零依赖**（只用 Node），所以它们同时跑在 CI 上；
+其余探针需要本机 DSH 依赖层，只在本地跑。
 
 `probe/contract-test.mjs` 是**回归护栏**，把三个"静默毁掉功能"的契约钉死了：
 
@@ -286,6 +316,41 @@ node --import ./probe/register.mjs probe/route-test.mjs <设计文档>          
 | `ctx.inject(['webServer'])` 注册 3 条路由；服务未就绪时不误判、就绪后由重试兜底补上 | 面板 `Unexpected end of JSON input` |
 | 会话工作区被记录后 `list`/`status` 都用它；部署根/越界/node_modules 一律 400 | 崩溃 7（弹窗空白 + 根切不回来） |
 | 无台账 / 台账 JSON 损坏时，注入退化为 `''` 且不抛 | 崩溃 5 的边界情况 |
+
+`probe/client-ui-test.mjs` 则守住**界面**这一侧：
+
+| 断言 | 防的是什么 |
+|---|---|
+| 交互底色不使用 `--dsw-alias-bg-layer-2`（浅色主题下 = 纯白） | hover 白底白字 |
+| 普通/列表 hover 用 `--dsw-alias-interactive-bg-hover` | 同上 |
+| 主按钮用 button-primary 三件套，且 hover 有独立规则 | 主按钮变色后文字消失 |
+| 主按钮文字不再是硬编码 `#fff` | 深色/浅色主题下对比度失配 |
+| `zh` / `en` 键集一致，且代码用到的每个 key 都有翻译 | 界面出现原始 key |
+| 槽位声明了 `locale` 命名空间、且不再自注入 `t` | 语言不跟随 DSH + 重复 prop 导致槽位装配抛错 |
+
+## 界面语言（i18n）
+
+面板文案**跟随 DSH 的语言设置**（DSH 内置 locale id 只有 `zh` 与 `en`）：
+
+```js
+// 1) 注册两套字典（一次调用覆盖全部内置语言）
+ctx.effect(() => ctx.locale.register(LOCALE_NS, { zh, en }), 'design-ledger: dictionaries')
+
+// 2) 槽位声明 locale 命名空间 → 渲染器注入**响应式**的 t 席位
+ctx.slots.register({ name: 'main', key: PANEL_ID, locale: LOCALE_NS }, LedgerPanel)
+```
+
+关键机制（都已在源码里核实，不是猜的）：
+
+- 渲染器的 `standardKit()` 在 `entry.locale !== undefined` 时执行
+  `kit["t"] = localeSeat(face, entry.locale)`，并用 `useLocaleRevision()` 订阅 revision ——
+  **所以组件里的 `props.t` 天生响应式，切换语言立即重渲染**，插件不需要自己订阅。
+- **因此不能自己 `inject: () => ({ t })`**：渲染器的 `assertNoPropOverlap()` 见到重复 prop 会抛
+  `SlotAssemblyError`，那是装配期错误，会让整个条目激活失败。
+- 侧栏按钮文字（`label`）由**侧栏**读取：它在每次语言变化时用
+  `ctx.locale.subscribe(syncPanels)` 重新解析所有面板标签，所以 `label` 只要返回"当前语言下的文案"，
+  就会自动跟随 —— 无需额外通知。
+- 字典查找失败时框架的 `t` **返回 key 本身**（不是 `undefined`），所以本地兜底必须先判"是否等于 key"。
 
 ## 设计文档的解析规则
 
@@ -479,6 +544,7 @@ dsh-design-ledger/
     ├── panel-list-test.mjs     # ⭐ 面板取数：会话工作区解析 + 越界拒绝
     ├── table-tree.mjs          # ⭐ 功能表行 → 功能节点（真实设计文档，只读）
     ├── readme-check.mjs        # 两版 README 体检：结构对齐 / 围栏成对 / 链接可解析（npm run check:readme）
+    ├── client-ui-test.mjs      # 客户端体检：按钮对比度 token / 字典完整性 / 语言接线（npm run check:client）
     ├── publish-audit.mjs       # 发布审计：与 GitHub 逐文件比对（Git blob 哈希）+ 隐私体检（npm run audit）
     ├── reorder-crashes.mjs     # 维护脚本：把「崩溃 N」小节重排为升序（发布前跑一次）
     ├── host-smoke.mjs          # 宿主端到端（假 ctx 跑完整流程）

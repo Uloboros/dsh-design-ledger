@@ -126,7 +126,10 @@ const ciPath = join(ROOT, '.github', 'workflows', 'ci.yml')
 if (existsSync(ciPath)) {
   const ci = readFileSync(ciPath, 'utf8')
   check('CI 不调用 probe/*（探针需要本机 DSH 依赖层）', !/npm run (contract|probe:)/.test(ci))
-  check('CI 覆盖语法检查 / 单测 / 文档体检', /npm run check\b/.test(ci) && /npm test/.test(ci) && /check:readme/.test(ci))
+  check(
+    'CI 覆盖语法检查 / 单测 / 文档体检 / 客户端体检',
+    /npm run check\b/.test(ci) && /npm test/.test(ci) && /check:readme/.test(ci) && /check:client/.test(ci),
+  )
 } else {
   console.log('  ℹ️ 未发现 .github/workflows/ci.yml（可选）')
 }

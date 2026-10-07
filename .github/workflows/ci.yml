@@ -42,3 +42,6 @@ jobs:
 
       - name: README health check (bilingual structure / fences / links)
         run: npm run check:readme
+
+      - name: Client UI check (button contrast / dictionary completeness / locale wiring)
+        run: npm run check:client
