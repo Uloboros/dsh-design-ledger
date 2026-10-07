@@ -76,15 +76,13 @@ jobs:
           TGZ="$(ls -1 *.tgz | head -n1)"
           echo "tgz=$TGZ" >> "$GITHUB_OUTPUT"
           echo "sha256=$(sha256sum "$TGZ" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-          # 附件内容自检：绝不能夹带运行痕迹
-          tar -tzf "$TGZ" > /tmp/list.txt
-          for bad in '.design-ledger' 'DEVPLAN' 'node_modules' '.git/'; do
-            if grep -q "$bad" /tmp/list.txt; then
-              echo "::error::tarball 内出现不该有的路径：$bad"
-              exit 1
-            fi
-          done
-          echo "tarball 文件数：$(wc -l < /tmp/list.txt)"
+          echo "已构建：$TGZ"
+
+      # 白名单审计：只允许 package.json 的 files 列出的内容出现。
+      # 失败时会打印 tarball 的完整清单 —— 日志自带证据，不必靠猜。
+      # 走文件路径而不是 `-`（stdin）：跨平台更稳，且失败信息可定位。
+      - name: Audit tarball contents (allow-list, verbatim listing on failure)
+        run: node probe/pack-audit.mjs "${{ steps.pack.outputs.tgz }}"
 
       - name: Extract release notes from CHANGELOG
         run: |

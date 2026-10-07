@@ -71,11 +71,24 @@ try {
   }
   const tgz = execFileSync('node', ['-e', `const fs=require('fs');console.log(fs.readdirSync(${JSON.stringify(tmp)}).find(f=>f.endsWith('.tgz')))`], { encoding: 'utf8' }).trim()
   const list = execFileSync('tar', ['-tzf', join(tmp, tgz)], { encoding: 'utf8' })
-  const bad = ['.design-ledger', 'DEVPLAN', 'node_modules', '.git/'].filter((b) => list.includes(b))
-  check('tarball 内无运行痕迹', bad.length === 0, bad.join(', '))
-  check('tarball 含入口 lib/index.js 与 client/client.js', list.includes('package/lib/index.js') && list.includes('package/client/client.js'))
-  check('tarball 含 package.json 与 cordis.patch.yml', list.includes('package/package.json') && list.includes('package/cordis.patch.yml'))
-  console.log('  ℹ️ 文件数 = ' + list.trim().split('\n').length + '，产物 = ' + tgz)
+  // 用与 workflow **同一个**审计脚本（probe/pack-audit.mjs）判定，避免两处判据漂移：
+  // 白名单 + 运行痕迹 + 必需文件，失败时它会打印完整清单。
+  const tgzPath = join(tmp, tgz)
+  let packOk = true
+  let packOut = ''
+  try {
+    packOut = execFileSync(process.execPath, [join(ROOT, 'probe', 'pack-audit.mjs'), tgzPath], {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    })
+  } catch (e) {
+    packOk = false
+    packOut = String((e && (e.stdout || e.message)) || e)
+  }
+  check('tarball 通过内容审计（白名单 + 无运行痕迹 + 必需文件）', packOk, packOk ? '' : '见下')
+  if (!packOk) console.log(packOut)
+  const entries = execFileSync('tar', ['-tf', tgzPath], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  console.log('  ℹ️ 文件数 = ' + entries.trim().split('\n').length + '，产物 = ' + tgz)
 } finally {
   try {
     rmSync(tmp, { recursive: true, force: true })
@@ -97,6 +110,7 @@ if (!existsSync(wfPath)) {
   check('用 npm pack 构建 tarball', /npm pack/.test(wf))
   check('建 Release 并附上 .tgz', /gh release create/.test(wf) && /\$\{\{ steps\.pack\.outputs\.tgz \}\}/.test(wf))
   check('校验 package.json 与输入版本一致', /与 package\.json 的/.test(wf))
+  check('用 pack-audit 做白名单审计（失败时打印完整清单）', /probe\/pack-audit\.mjs/.test(wf))
 }
 
 console.log('\n' + (failures.length === 0 ? '发版前自检通过 ✅' : '失败 ' + failures.length + ' 项 ❌：' + failures.join(' | ')))

@@ -9,6 +9,12 @@
 
 ### 修正 Fixed
 
+- **发布流程在 CI 上误报后无法定位**：`release.yml` 原先用一段 bash `grep -q` 黑名单自检，
+  失败时只回报"哪条黑名单命中"，**不回报命中了哪条路径**；而开发机上 `.design-ledger/`
+  恰好不存在，于是本地永远复现不出来。现改为 [`probe/pack-audit.mjs`](probe/pack-audit.mjs)：
+  **白名单判据**（只允许 `package.json` 的 `files` 列出的内容 + npm 固定项），
+  按**路径分量**精确匹配（不再用子串包含，避免"文档里提到该字样"这类误报），
+  并在失败时**打印 tarball 完整清单**，让日志自带证据。新增 `npm run check:pack`。
 - **`peerDependencies` 只保留真正被 import 的 harness 包**：原先还声明了
   `@deepseek-ai/cordis`（`^4.0.4`）与 `@deepseek-ai/dsh-system-prompt`，但代码里
   **只 import 了 `@deepseek-ai/dsh-tools`**。这两个包由 DSH 运行时提供、不经 npm 解析，

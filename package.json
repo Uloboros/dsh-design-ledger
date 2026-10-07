@@ -74,6 +74,7 @@
     "probe:tree": "node --import ./probe/register.mjs probe/table-tree.mjs",
     "audit": "node probe/publish-audit.mjs",
     "check:release": "node probe/release-check.mjs",
+    "check:pack": "node probe/pack-audit.mjs",
     "verify": "npm run check && npm test && npm run check:readme && npm run check:client && npm run contract"
   }
 }

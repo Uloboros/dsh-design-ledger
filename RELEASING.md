@@ -48,7 +48,8 @@ npm pack                        # 手动打包，再把 .tgz 拖到 Release 附�
 | 项 | 怎么做 |
 |---|---|
 | 校验全绿 | `npm run verify`（语法 / 13 单测 / 文档体检 / 客户端体检 / 契约自检） |
-| 发版自检 | `npm run check:release` |
+| 发版自检 | `npm run check:release`（含 tarball 白名单审计） |
+| 发布包内容 | `npm run check:pack`（白名单：只允许 `files` 列出的内容；失败时打印完整清单） |
 | 双语文档同步 | 改了任一版 README 就必须同步另一版；`check:readme` 会比对标题数与层级 |
 | 仓库元数据齐全 | `npm run check:readme` 会提醒缺失或仍是占位符的字段 |
 | CHANGELOG 有对应小节 | 否则 Release 正文会空 |
