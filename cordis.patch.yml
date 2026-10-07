@@ -1,0 +1,11 @@
+# dsh-design-ledger bundle layer
+#
+# 挂载声明：DSH 启动时按 bundle 层栈叠加各插件 patch，本文件把本插件的行插入
+# profile 配置树。安装方式：
+#
+#   plugin_manager install_bundle  target = link:<本目录绝对路径>
+#
+# 行 id 是 `design-ledger`。宿主侧配置字段（如注入开关）写在行的 config 下。
+- insert:
+    - id: design-ledger
+      name: dsh-design-ledger

@@ -1,0 +1,17 @@
+# 依赖与构建产物
+node_modules/
+*.log
+
+# 插件自身的落盘诊断（每次 apply 都会在工作区写 diag.log，属于本地运行痕迹）
+.design-ledger/
+
+# 台账的易变状态（聚焦节点、任务提示词）——结构文件仍应提交。
+# 建议提交：DEVPLAN/index.json + DEVPLAN/systems/*.json（它们是可审查的进度结构）
+DEVPLAN/state.json
+DEVPLAN/**/*.tmp-*
+
+# 编辑器/系统
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

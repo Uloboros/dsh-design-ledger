@@ -1,0 +1,83 @@
+{
+  "name": "dsh-design-ledger",
+  "version": "0.1.0",
+  "private": true,
+  "description": "把设计文档变成可实时更新的开发进度树，并分层注入 DSH 会话上下文，使新会话在大项目上下文耗尽后仍能接上进度。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./client/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "client",
+    "skills",
+    "probe",
+    "test",
+    "cordis.patch.yml",
+    "README.md",
+    "README.en.md",
+    "LICENSE",
+    ".gitattributes"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "design-document",
+    "progress-ledger",
+    "context"
+  ],
+  "//": "↓↓↓ 把下面的 <your-github-username> 全部替换成你的 GitHub 用户名（共 3 处），然后删掉本行注释 ↓↓↓",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/<your-github-username>/dsh-design-ledger.git"
+  },
+  "homepage": "https://github.com/<your-github-username>/dsh-design-ledger#readme",
+  "bugs": {
+    "url": "https://github.com/<your-github-username>/dsh-design-ledger/issues"
+  },
+  "author": "Uloboros",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.4",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-system-prompt": ">=0.2.0-rc.1 <0.3.0-0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-tools": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-system-prompt": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "test": "node --test test/core.test.js test/agents-md.test.js",
+    "check": "node --check lib/index.js && node --check lib/design-doc.js && node --check lib/ledger.js && node --check lib/inject.js && node --check lib/agents-md.js && node --check client/client.js",
+    "check:readme": "node probe/readme-check.mjs",
+    "contract": "node --import ./probe/register.mjs probe/contract-test.mjs",
+    "probe:panel": "node --import ./probe/register.mjs probe/panel-list-test.mjs .",
+    "probe:tree": "node --import ./probe/register.mjs probe/table-tree.mjs",
+    "verify": "npm run check && npm test && npm run check:readme && npm run contract"
+  }
+}

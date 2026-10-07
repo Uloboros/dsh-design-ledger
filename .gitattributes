@@ -1,0 +1,19 @@
+# 统一换行与文本处理规则。
+#
+# 为什么需要：本插件在 Windows 上开发（源码含大量中文与 emoji），若不声明，
+# git 可能按平台自动转换换行，导致 README 与代码的 diff 出现整文件"改了又改"。
+# 这里显式固定：文本一律 LF 入库，Windows 检出时保持 LF（JS 工具链全支持）。
+* text=auto eol=lf
+
+# 明确语言，GitHub 才会正确统计与高亮
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+
+# 二进制（若将来加入图片资源）
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.zip  binary

@@ -1,0 +1,44 @@
+# CI：语法检查 + 单元测试 + 双语文档体检。
+#
+# 为什么只有这三项：它们**零依赖**（只用 Node 内置的 --check / --test），
+# 不需要 DSH、不需要 npm install，因此在任何 runner 上都能稳定跑绿。
+#
+# 刻意**不跑** probe/*（那些是自检探针）：它们要通过 probe/resolve-hook.mjs
+# 复现 DSH 的模块解析，需要本机的 DSH 依赖目录（@deepseek-ai/*），CI 上没有，
+# 必然失败。探针请在装了 DSH 的机器上按 README「验证顺序」手动跑。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['20', '22']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Syntax check (lib/ and client/)
+        run: npm run check
+
+      - name: Unit tests
+        run: npm test
+
+      - name: README health check (bilingual structure / fences / links)
+        run: npm run check:readme
