@@ -58,16 +58,18 @@ for (const [sid, nodes] of built.systems) {
   const feats = [...nodes.values()].filter((n) => n.kind === 'feature').length
   totals.nodes += nodes.size
   totals.features += feats
-  console.log(`\n■ ${rootNode.name}  [${sid}]`)
+  // 只打印**结构信息**（层级/类型/体量），不打印真实语料的系统名与条目名：
+  // 本探针的输出经常被贴进 issue 或对话，带上真实项目名与功能 id 就等于外泄私有语料。
+  console.log(`\n■ ${sid}  (kind=${rootNode.kind})`)
   console.log(
-    `   节点 ${st.total}（功能 ${feats}）  完成度 ${st.done}/${st.total}  ` +
+    `   nodes=${st.total} features=${feats} done=${st.done}  ` +
       `design≈${rootNode.docTokens} tok  analysis≈${rootNode.analysisTokens ?? 0} tok`,
   )
   for (const cid of rootNode.children) {
     const n = nodes.get(cid)
     if (!n) continue
-    console.log(`   ├─ ${n.name}   [${n.id.split('/').slice(1).join('/')}]`)
-    if (n.notes) console.log(`   │    设计态：${n.notes}`)
+    // 相对 id 足以说明层级；条目名与设计态文案一律不打印。
+    console.log(`   ├─ [${n.kind}] ${n.id.split('/').slice(1).join('/')}  refs=${(n.designRefs ?? []).length}`)
   }
 }
 

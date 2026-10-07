@@ -3,7 +3,7 @@
  *
  * 你的真实文档在 S0N_* 下没有子目录，所以这里用合成结构验证深层能力：
  *   03_systems/
- *     S01_core_gameplay/            → 系统
+ *     S01_sample_system/            → 系统
  *       design.md                   → 该层级正文（名称取 H1）
  *       S01_01_combat/              → 子系统
  *         design.md
@@ -28,7 +28,7 @@ const { buildLedgerFromScan, countSubtree } = await import(
 )
 
 console.log('=== 目录名推断（深层）===')
-for (const n of ['S01_core_gameplay', 'S01_01_combat', 'S01_01_01_hitbox', '03_systems', '01_top_design']) {
+for (const n of ['S01_sample_system', 'S01_01_combat', 'S01_01_01_hitbox', '03_systems', '01_top_design']) {
   const c = classifyDirName(n)
   console.log(`  ${n.padEnd(22)} kind=${String(c.kind).padEnd(10)} index=${c.index} code=${c.code}`)
 }
@@ -39,10 +39,10 @@ try {
     await mkdir(join(root, rel.split('/').slice(0, -1).join('\\')), { recursive: true })
     await writeFile(join(root, rel.split('/').join('\\')), text, 'utf8')
   }
-  await w('03_systems/S01_core_gameplay/design.md', '# 核心玩法系统\n')
-  await w('03_systems/S01_core_gameplay/S01_01_combat/design.md', '# 战斗子系统\n')
-  await w('03_systems/S01_core_gameplay/S01_01_combat/S01_01_01_hitbox/design.md', '# 命中判定\n')
-  await w('03_systems/S01_core_gameplay/S01_01_combat/S01_01_02_damage/design.md', '# 伤害计算\n')
+  await w('03_systems/S01_sample_system/design.md', '# 示例系统\n')
+  await w('03_systems/S01_sample_system/S01_01_combat/design.md', '# 战斗子系统\n')
+  await w('03_systems/S01_sample_system/S01_01_combat/S01_01_01_hitbox/design.md', '# 命中判定\n')
+  await w('03_systems/S01_sample_system/S01_01_combat/S01_01_02_damage/design.md', '# 伤害计算\n')
   await w('03_systems/S02_base/design.md', '# 基地系统\n')
 
   const scan = await scanDesignDocs({ rootPath: root })
@@ -69,7 +69,7 @@ try {
     walk(sid, 0)
   }
 
-  const sys = built.systems.get('03_systems/S01_core_gameplay')
+  const sys = built.systems.get('03_systems/S01_sample_system')
   const kinds = [...sys.values()].map((n) => n.kind)
   console.log('\n=== 断言 ===')
   console.log('  节点总数 =', sys.size, '(期望 4：系统+子系统+2功能)')

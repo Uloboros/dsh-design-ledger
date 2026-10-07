@@ -143,6 +143,85 @@ for (const rel of [...local].sort()) {
 check('无操作系统用户名 / 邮箱等真正隐私信息', hard === 0, hard + ' 处')
 console.log(`  ℹ️ 另有 ${soft} 处示例性机器路径 / 公开账户名（按设计保留，详见脚本注释）`)
 
+console.log('\n=== 2b) 私有语料残留 ===')
+/**
+ * 分两层判据，避免"一律禁"导致长期误报（误报多了就会被无视）：
+ *
+ * **硬性（判失败）**：`test/` 与 `probe/` 里的夹具与示例**必须完全合成化**。
+ *   测试只验证"解析机制"（ID 列识别 / 名称提取 / 体量归属），绑定某个私有语料的
+ *   真实目录名与条目 id 既不必要，也让仓库带着私人项目的痕迹。
+ *
+ * **允许（仅报告）**：`README.*` / `skills/` / `lib/` 的注释与工具描述里，
+ *   为解释"目录推断规则""表格行 → 功能节点"而引用的具体例子。
+ *   没有具体例子用户根本看不懂规则，所以这类引用是必要的；它们引用的是
+ *   **结构命名约定**（`S0N_名称`）与**条目标题**，不含任何设计内容。
+ *
+ * 另外：私有**项目名**（"肉鸽"）在任何位置都不允许 —— 它标识的是哪个私有项目。
+ */
+const CORPUS_HARD = [
+  { re: /肉鸽/, what: '私有项目名' },
+  { re: /S0[1-9]_(?:core_gameplay|base_building|progression_economy|engineer_horde)/, what: '私有系统目录名' },
+  { re: /\b(?:BFT|TOW|TEC|DEV|ENG)_\d{3}\b/, what: '私有条目 ID' },
+  { re: /工业复兴计划|后勤保障·|卫星侦测|增强相控阵雷达|废土组装大师|加速装填机/, what: '私有设计条目名' },
+]
+/** 允许出现规则举例的文件（文档 / 技能 / 库注释与工具描述）。 */
+const EXAMPLE_OK = /^(?:README(?:\.en)?\.md|skills\/|lib\/)/
+let corpus = 0
+let corpusReported = 0
+for (const rel of [...local].sort()) {
+  if (!TEXT_EXT.test(rel) || rel === SELF) continue
+  const lines = readFileSync(join(ROOT, rel), 'utf8').split(/\r?\n/)
+  for (let i = 0; i < lines.length; i++) {
+    for (const rule of CORPUS_HARD) {
+      if (!rule.re.test(lines[i])) continue
+      if (EXAMPLE_OK.test(rel)) {
+        corpusReported += 1
+        continue
+      }
+      corpus += 1
+      console.log(`  ❌ [${rule.what}] ${rel}:${i + 1}`)
+      console.log(`        ${lines[i].trim().slice(0, 120)}`)
+    }
+  }
+}
+check(
+  'test/ 与 probe/ 中无私有语料标识（夹具均已合成化）',
+  corpus === 0,
+  corpus + ' 处',
+)
+console.log(`  ℹ️ 文档/技能/工具描述中另有 ${corpusReported} 处规则举例（按设计保留：没有例子讲不清规则）`)
+// ⚠️ 必须排除本文件自身：它的检测规则里就写着这些标识，扫自己必然命中。
+// （这个坑踩过两次：第一次是隐私循环，第二次是这行漏了排除。）
+check('全仓库不含私有项目名', ![...local].filter((r) => r !== SELF).some((r) => /肉鸽/.test(readFileSync(join(ROOT, r), 'utf8'))))
+
+console.log('\n=== 2c) 意料之外的上传 ===')
+/** 只允许这些顶层条目出现（与 package.json 的 files / 发布意图一致）。 */
+const ALLOWED_TOP = new Set([
+  '.gitattributes',
+  '.gitignore',
+  '.github',
+  'CHANGELOG.md',
+  'LICENSE',
+  'README.en.md',
+  'README.md',
+  'client',
+  'cordis.patch.yml',
+  'lib',
+  'package.json',
+  'probe',
+  'skills',
+  'test',
+])
+const top = [...new Set([...local].map((p) => p.split('/')[0]))].sort()
+const unexpected = top.filter((t) => !ALLOWED_TOP.has(t))
+console.log('  顶层条目：' + top.join(', '))
+check('没有意料之外的文件/目录被上传', unexpected.length === 0, unexpected.join(', '))
+
+// 运行痕迹与本地状态绝不能入库（哪怕 .gitignore 写错了也要拦住）
+const FORBIDDEN = ['.design-ledger/', 'DEVPLAN/', 'node_modules/', '.git/', 'state.json', 'diag.log', 'AGENTS.md']
+const leakedPaths = [...local].filter((p) => FORBIDDEN.some((f) => p === f.replace(/\/$/, '') || p.startsWith(f) || p.endsWith('/' + f)))
+check('无运行痕迹/台账/本地状态文件入库', leakedPaths.length === 0, leakedPaths.join(', '))
+
 console.log('\n=== 3) 隐私体检：密钥形态 ===')
 const SECRET_RE = /sk-[A-Za-z0-9]{16,}|ghp_[A-Za-z0-9]{20,}|github_pat_|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----/
 let secrets = 0

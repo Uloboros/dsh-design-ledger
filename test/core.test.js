@@ -20,7 +20,7 @@ import { classifyDirName, estimateTokens, parseHeadings, parseStructure, scanDes
 import { buildLedgerFromScan, countSubtree, Ledger, rollupStatus } from '../lib/ledger.js'
 import { assembleInjection, renderFocusSubtree, renderIndex } from '../lib/inject.js'
 
-test('classifyDirName：真实项目的命名结构', () => {
+test('classifyDirName：命名结构推断（合成样例）', () => {
   // 纯数字前缀 → 分组
   assert.deepEqual(classifyDirName('00_concept'), {
     index: 0,
@@ -34,9 +34,9 @@ test('classifyDirName：真实项目的命名结构', () => {
   assert.equal(classifyDirName('03_systems').index, 3)
 
   // S0N_名称 → 系统
-  const sys = classifyDirName('S01_core_gameplay')
+  const sys = classifyDirName('S01_sample_system')
   assert.equal(sys.kind, 'system')
-  assert.equal(sys.name, 'core_gameplay')
+  assert.equal(sys.name, 'sample_system')
   assert.equal(sys.code, 'S01')
   assert.equal(sys.index, 100)
 
@@ -97,11 +97,11 @@ test('scanDesignDocs + buildLedgerFromScan：按目录结构建树，名称取�
     // 构造与真实项目同构的目录
     await mkdir(join(root, '01_top_design'), { recursive: true })
     await writeFile(join(root, '01_top_design', 'design.md'), '# 顶层设计总纲\n\n正文内容\n', 'utf8')
-    await mkdir(join(root, '03_systems', 'S01_core_gameplay'), { recursive: true })
-    await writeFile(join(root, '03_systems', 'S01_core_gameplay', 'design.md'), '# 核心玩法系统\n\n## 战斗\n\n## 移动\n', 'utf8')
-    await writeFile(join(root, '03_systems', 'S01_core_gameplay', 'analysis.md'), '# 分析\n', 'utf8')
-    await mkdir(join(root, '03_systems', 'S02_base_building'), { recursive: true })
-    await writeFile(join(root, '03_systems', 'S02_base_building', 'design.md'), '# 基地建造系统\n', 'utf8')
+    await mkdir(join(root, '03_systems', 'S01_sample_system'), { recursive: true })
+    await writeFile(join(root, '03_systems', 'S01_sample_system', 'design.md'), '# 示例系统\n\n## 战斗\n\n## 移动\n', 'utf8')
+    await writeFile(join(root, '03_systems', 'S01_sample_system', 'analysis.md'), '# 分析\n', 'utf8')
+    await mkdir(join(root, '03_systems', 'S02_other_system'), { recursive: true })
+    await writeFile(join(root, '03_systems', 'S02_other_system', 'design.md'), '# 另一个系统\n', 'utf8')
 
     const scan = await scanDesignDocs({ rootPath: root })
     assert.equal(scan.totals.files, 4)
@@ -123,20 +123,20 @@ test('scanDesignDocs + buildLedgerFromScan：按目录结构建树，名称取�
     // 两个系统各自一个分片
     assert.equal(built.index.systems.length, 2)
     const ids = built.index.systems.map((s) => s.id).sort()
-    assert.deepEqual(ids, ['03_systems/S01_core_gameplay', '03_systems/S02_base_building'])
+    assert.deepEqual(ids, ['03_systems/S01_sample_system', '03_systems/S02_other_system'])
 
     // 名称必须取设计文档的 H1，而不是目录名
-    const s1 = built.index.systems.find((s) => s.id.endsWith('S01_core_gameplay'))
-    assert.equal(s1.name, '核心玩法系统')
+    const s1 = built.index.systems.find((s) => s.id.endsWith('S01_sample_system'))
+    assert.equal(s1.name, '示例系统')
     const sysNodes = built.systems.get(s1.id)
     const rootNode = sysNodes.get(s1.id)
-    assert.equal(rootNode.name, '核心玩法系统')
+    assert.equal(rootNode.name, '示例系统')
     // designRefs 指向 design.md 与分析文档
     assert.deepEqual(
       rootNode.designRefs.map((r) => r.file).sort(),
-      ['03_systems/S01_core_gameplay/analysis.md', '03_systems/S01_core_gameplay/design.md'],
+      ['03_systems/S01_sample_system/analysis.md', '03_systems/S01_sample_system/design.md'],
     )
-    assert.equal(rootNode.designRefs.find((r) => r.file.endsWith('design.md')).heading, '核心玩法系统')
+    assert.equal(rootNode.designRefs.find((r) => r.file.endsWith('design.md')).heading, '示例系统')
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -152,7 +152,7 @@ test('parseStructure：只把「首列是 ID」的表当功能表，普通表格
     '',
     '| 增益ID | 增益名称 | 增益类别 | 效果文本 | 当前状态 |',
     '|---|---|---|---|---|',
-    '| BFT_001 | 待定 | 通用增益 | 提高容量 | 机制已明确，名称待定 |',
+    '| ABC_001 | 待定 | 通用增益 | 提高容量 | 机制已明确，名称待定 |',
     '',
     '### 系统协作表',
     '',
@@ -182,9 +182,9 @@ test('parseStructure：只把「首列是 ID」的表当功能表，普通表格
   assert.ok(plain, '普通表格不应判为功能表')
   assert.equal(feature.heading, '局内升级增益表')
   assert.equal(feature.rows.length, 1)
-  assert.equal(feature.rows[0].id, 'BFT_001')
+  assert.equal(feature.rows[0].id, 'ABC_001')
   // 名称是"待定"时用同行的类别补一个可读名字，避免一堆同名节点
-  assert.match(feature.rows[0].name, /BFT_001/)
+  assert.match(feature.rows[0].name, /ABC_001/)
   assert.match(feature.rows[0].name, /通用增益/)
 })
 
@@ -195,16 +195,16 @@ test('buildLedgerFromScan：功能表行展开成 feature 子节点（方案 A�
     await writeFile(
       join(root, '03_systems', 'S03_economy', 'design.md'),
       [
-        '# 局内成长与经济',
+        '# 示例成长系统',
         '',
         '## 状态与规则',
         '',
-        '### 局外通用科技树表',
+        '### 示例科技树表',
         '',
         '| 科技ID | 科技名称 | 科技类别 | 当前状态 |',
         '|---|---|---|---|',
-        '| TEC_001 | 工业复兴计划 | 通用科技 | 名称已明确，成本待定 |',
-        '| TEC_002 | 待定 | 通用科技 | 机制已明确，名称待定 |',
+        '| FOO_001 | 示例科技 | 示例类别 | 名称已明确，成本待定 |',
+        '| FOO_002 | 待定 | 示例类别 | 机制已明确，名称待定 |',
         '',
       ].join('\n'),
       'utf8',
@@ -222,18 +222,18 @@ test('buildLedgerFromScan：功能表行展开成 feature 子节点（方案 A�
     const features = rootNode.children.map((id) => nodes.get(id))
     assert.ok(features.every((n) => n.kind === 'feature'), '子节点应为 feature')
     assert.ok(features.every((n) => n.parentId === sysId))
-    assert.deepEqual(features.map((n) => n.name), ['工业复兴计划', 'TEC_002（通用科技）'])
+    assert.deepEqual(features.map((n) => n.name), ['示例科技', 'FOO_002（示例类别）'])
     // id 必须唯一且可读（组名 # 行 ID）；每行都带表名前缀，便于对回设计文档
     assert.equal(new Set(features.map((n) => n.id)).size, 2)
     assert.ok(features[0].id.startsWith(sysId + '/'))
-    assert.match(features[0].id, /局外通用科技树表#TEC_001/)
-    assert.match(features[1].id, /局外通用科技树表#TEC_002/)
+    assert.match(features[0].id, /示例科技树表#FOO_001/)
+    assert.match(features[1].id, /示例科技树表#FOO_002/)
     // 表格的「当前状态」列原样进 notes（渲染时由 inject 加前缀，不再套两层）
     assert.equal(features[0].notes, '名称已明确，成本待定')
     assert.ok(!features[0].notes.startsWith('设计态：'), 'notes 不应自带"设计态："前缀')
     assert.equal(features[0].designRefs[0].file, '03_systems/S03_economy/design.md')
-    assert.equal(features[0].designRefs[0].heading, '局外通用科技树表')
-    assert.equal(features[0].designRefs[0].anchor, 'TEC_001')
+    assert.equal(features[0].designRefs[0].heading, '示例科技树表')
+    assert.equal(features[0].designRefs[0].anchor, 'FOO_001')
     assert.ok(features[0].docTokens > 0, '功能节点应带上所在小节的体量')
 
     // analysis.md 的体量单独记，不再混进 docTokens（否则索引与 designStats 对不上）
