@@ -12,8 +12,8 @@
  *         S01_01_02_damage/         → 功能
  *           design.md
  */
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { cleanupTemp, makeTempDir } from './temp.mjs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -33,7 +33,7 @@ for (const n of ['S01_sample_system', 'S01_01_combat', 'S01_01_01_hitbox', '03_s
   console.log(`  ${n.padEnd(22)} kind=${String(c.kind).padEnd(10)} index=${c.index} code=${c.code}`)
 }
 
-const root = await mkdtemp(join(tmpdir(), 'dl-deep-'))
+const root = await makeTempDir('dl-deep-')
 try {
   const w = async (rel, text) => {
     await mkdir(join(root, rel.split('/').slice(0, -1).join('\\')), { recursive: true })
@@ -80,7 +80,7 @@ try {
   // 清理失败不影响结论：Windows 上临时目录偶发 EPERM/ENOTEMPTY，
   // 在 finally 里抛出会让进程以退出码 1 结束，看起来像"测试失败"（本机踩过）。
   try {
-    await rm(root, { recursive: true, force: true })
+    await cleanupTemp(root)
   } catch (e) {
     console.log('  ℹ️ 临时目录清理失败（不影响上面的结论）: ' + String((e && e.message) || e))
   }

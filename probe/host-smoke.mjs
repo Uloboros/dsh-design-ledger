@@ -8,8 +8,8 @@
  * 运行（cwd = 插件目录）：
  *   node --import ./probe/register.mjs probe/host-smoke.mjs <设计文档路径> <工作区路径>
  */
-import { mkdtemp, rm, cp } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { cp } from 'node:fs/promises'
+import { cleanupTemp, makeTempDir } from './temp.mjs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -96,7 +96,7 @@ if (!DESIGN_SRC || !WS_RO) {
 }
 
 // ── 在临时工作区里复制一份设计文档，避免污染真实目录 ──
-const ws = await mkdtemp(join(tmpdir(), 'dl-smoke-'))
+const ws = await makeTempDir('dl-smoke-')
 try {
   const designDst = join(ws, 'design-docs')
   await cp(DESIGN_SRC, designDst, { recursive: true })
@@ -178,7 +178,7 @@ try {
 } finally {
   // 同上：清理失败不该伪装成测试失败（Windows 临时目录偶发 EPERM）。
   try {
-    await rm(ws, { recursive: true, force: true })
+    await cleanupTemp(ws)
   } catch (e) {
     console.log('  ℹ️ 临时目录清理失败（不影响上面的结论）: ' + String((e && e.message) || e))
   }

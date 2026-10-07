@@ -6,8 +6,8 @@
  *   4. bind 拒绝越界路径
  *   5. status 反映绑定结果
  */
-import { mkdtemp, rm, cp } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { cp } from 'node:fs/promises'
+import { cleanupTemp, makeTempDir } from './temp.mjs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -101,7 +101,7 @@ async function invoke(method, path, { query = '', body = null } = {}) {
   return { statusCode, body: parsed }
 }
 
-const ws = await mkdtemp(join(tmpdir(), 'dl-route-'))
+const ws = await makeTempDir('dl-route-')
 try {
   wsRoot = ws
   await cp(DESIGN_SRC, join(ws, 'design-docs'), { recursive: true })
@@ -165,7 +165,7 @@ try {
   // 清理失败**不能**影响结论：Windows 上临时目录偶发 EPERM/ENOTEMPTY（杀软或文件句柄未释放），
   // 而 finally 里抛出的错误会直接让进程以退出码 1 结束，看起来像"测试失败"，非常误导。
   try {
-    await rm(ws, { recursive: true, force: true })
+    await cleanupTemp(ws)
   } catch (e) {
     console.log('  ℹ️ 临时目录清理失败（不影响上面的结论）: ' + String((e && e.message) || e))
   }

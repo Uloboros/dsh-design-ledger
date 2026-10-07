@@ -15,25 +15,14 @@
  * 运行：node --import ./probe/register.mjs probe/contract-test.mjs
  * 退出码非 0 = 契约被破坏。
  */
-import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { cleanupTemp, makeTempDir } from './temp.mjs'
 import { pathToFileURL } from 'node:url'
 
 const MODULE_URL = pathToFileURL(join(process.cwd(), 'lib', 'index.js')).href
 
-/**
- * 清理临时工作区，**绝不让清理失败伪装成测试失败**。
- * Windows 上临时目录偶发 EPERM/ENOTEMPTY（杀软或文件句柄未释放），而 `finally` 里
- * 抛出的错误会让进程以退出码 1 结束 —— 看起来像断言失败，非常误导（本机踩过）。
- */
-async function cleanup(dir) {
-  try {
-    await rm(dir, { recursive: true, force: true })
-  } catch (e) {
-    console.log('  ℹ️ 临时目录清理失败（不影响结论）: ' + String((e && e.message) || e))
-  }
-}
 
 /** 记录所有失败的断言。 */
 const failures = []
@@ -207,7 +196,7 @@ try {
 
 // ── 场景 1：台账存在 + webServer 可用 ──
 console.log('\n=== 场景 1：台账存在，webServer 可用 ===')
-const ws1 = await mkdtemp(join(tmpdir(), 'dl-contract-'))
+const ws1 = await makeTempDir('dl-contract-')
 try {
   await writeLedger(ws1, join(ws1, 'docs'))
   const env1Routes = []
@@ -331,12 +320,12 @@ try {
     check('webServer 就绪后由重试兜底完成注册（3 条）', lateRoutes.length === 3, '实际 ' + lateRoutes.length)
   }
 } finally {
-  await cleanup()
+  await cleanupTemp(ws1)
 }
 
 // ── 场景 2：无台账（注入文本必须退化为 ''，仍然不能抛） ──
 console.log('\n=== 场景 2：工作区没有台账 ===')
-const ws2 = await mkdtemp(join(tmpdir(), 'dl-contract-empty-'))
+const ws2 = await makeTempDir('dl-contract-empty-')
 try {
   const env = makeCtx({ workspaceRoot: ws2, webServer: { register: () => () => {} } })
   mod.apply(env.ctx)
@@ -355,12 +344,12 @@ try {
     })())
   }
 } finally {
-  await cleanup()
+  await cleanupTemp(ws2)
 }
 
 // ── 场景 3：台账 JSON 损坏（读盘抛错也必须退化为字符串） ──
 console.log('\n=== 场景 3：台账 index.json 损坏 ===')
-const ws3 = await mkdtemp(join(tmpdir(), 'dl-contract-corrupt-'))
+const ws3 = await makeTempDir('dl-contract-corrupt-')
 try {
   await mkdir(join(ws3, 'DEVPLAN'), { recursive: true })
   await writeFile(join(ws3, 'DEVPLAN', 'index.json'), '{ this is not json', 'utf8')
@@ -380,12 +369,12 @@ try {
     })())
   }
 } finally {
-  await cleanup()
+  await cleanupTemp(ws3)
 }
 
 // ── 场景 4：webServer 尚未就绪（注入回调暂时不触发） ──
 console.log('\n=== 场景 4：webServer 未就绪（apply 时不注册，但不能抛） ===')
-const ws4 = await mkdtemp(join(tmpdir(), 'dl-contract-latews-'))
+const ws4 = await makeTempDir('dl-contract-latews-')
 try {
   let threw = null
   const env = makeCtx({ workspaceRoot: ws4, webServer: null })
@@ -398,7 +387,29 @@ try {
   const section = env.sections.find((s) => s.name === 'design-ledger')
   check('段落仍注册（与路由解耦）', !!section)
 } finally {
-  await cleanup()
+  await cleanupTemp(ws4)
+}
+
+// ── 场景 5：客户端注入契约（用户实测报过的两个 UI 问题） ──
+console.log('\n=== 场景 5：客户端槽位注入与配色契约 ===')
+{
+  const src = readFileSync(join(process.cwd(), 'client', 'client.js'), 'utf8')
+  // ⚠️ 必须先去掉注释再断言：本仓库的注释里**大量引用**这些模式本身
+  //（例如"不能再 `inject: () => ({ t })`"），对原文匹配会把说明文字当成真实代码。
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"\\])\/\/[^\n]*/g, '$1')
+  check(
+    '槽位声明了 locale 命名空间（框架才会注入响应式 t 席位）',
+    /name: 'main'[\s\S]{0,200}?locale: LOCALE_NS/.test(code),
+  )
+  check('不再自注入 t（重复 prop 会让槽位装配抛错）', !/inject:\s*\(\)\s*=>\s*\(\{\s*t\s*\}\)/.test(code))
+  check(
+    '交互底色未使用 bg-layer-2（浅色主题下 = 纯白，会导致 hover 白底白字）',
+    !/:(?:hover|active)[^{]*\{[^}]*--dsw-alias-bg-layer-2/.test(code),
+  )
+  check(
+    '主按钮 hover 有独立规则（不被通用 hover 覆盖）',
+    /\.dlg-primary:hover:not\(:disabled\)/.test(code),
+  )
 }
 
 console.log('\n' + (failures.length === 0 ? '全部通过 ✅' : '失败 ' + failures.length + ' 项 ❌：' + failures.join(' | ')))
