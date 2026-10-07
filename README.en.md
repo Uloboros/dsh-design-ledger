@@ -249,7 +249,11 @@ Because the plugin wrapped construction errors into "skip this tool", the result
 
 **Lesson**: on a session-less endpoint, `sandboxPolicy.resolve()` does **not** return the user's workspace — you must learn it from the session side. Also: **"the panel opens" is not evidence that "the root is right"**; on this machine the root was only exposed as wrong after the client was fixed enough to display it.
 
-### Verification order when changing this plugin (no DSH restart needed)
+### Verification order when changing this plugin (**for people editing the code; users can skip this**)
+
+> If you only want to use the plugin, you can stop here and jump to "UI language (i18n)" or
+> "Design document parsing rules" below. These commands are for developing this repository and need Node;
+> the ⭐ probes additionally need DSH installed locally (see the note after the repository layout).
 
 ```powershell
 npm run verify                                                            # syntax + unit tests + docs check + client check + contract (one command)
@@ -407,16 +411,8 @@ git clone https://github.com/<owner>/dsh-design-ledger.git
 
 There is no build step: the plugin is plain ESM `.js`, and the client half is loaded as a classic script.
 
-## Releasing your own version (maintainer checklist)
-
-1. `npm run verify` — syntax + 13 unit tests + bilingual README health check + contract self-check; all must be green.
-2. `node probe/reorder-crashes.mjs` — keeps the README "Crash N" sections in ascending order (run it after editing docs).
-3. Update `CHANGELOG.md` and the `version` in `package.json`.
-4. Fill in `package.json`'s `repository` / `homepage` / `bugs` / `author` (`npm run check:readme` reminds you which are missing).
-5. `git add -A && git commit -m "..." && git tag vX.Y.Z && git push --follow-tags`.
-6. Create the GitHub Release from that tag, using the matching `CHANGELOG.md` section as the body.
-   **Note**: the third-party `@deepseek-ai/*` packages are published on npm, so `peerDependencies` resolve normally;
-   if you want to publish `dsh-design-ledger` itself to npm, remove `"private": true` first.
+> To **cut a new release** (tag, Release, tarball asset) see [RELEASING.md](RELEASING.md) — that is a maintainer
+> workflow with nothing in it for users, so it does not live here.
 
 ## Verification status (measured on this machine)
 
@@ -475,6 +471,7 @@ dsh-design-ledger/
 ├── .gitattributes              # force LF in the repository (Windows development, avoids whole-file diffs)
 ├── .gitignore                  # ignores .design-ledger/ (plugin diagnostics) and DEVPLAN/state.json
 ├── README.md / README.en.md    # Chinese / English docs (section-by-section parallel)
+├── RELEASING.md                # release process (maintainers only; users can ignore it)
 ├── lib/
 │   ├── index.js                # host half: 6 tools + 3 panel routes + the injection section
 │   ├── design-doc.js           # scanning, heading sections, table-row extraction (pure logic, unit-testable)

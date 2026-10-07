@@ -60,7 +60,15 @@ check('发布正文抽取结果非空', notes.length > 0, notes.length + ' 字�
 console.log('\n=== 2) tarball 内容自检（与 workflow 同款 grep）===')
 const tmp = mkdtempSync(join(tmpdir(), 'dsh-relcheck-'))
 try {
-  execFileSync('npm', ['pack', '--pack-destination', tmp], { cwd: ROOT, stdio: 'ignore', shell: true })
+  // Windows 上 npm 是 .cmd，需要 shell 才能找到；但**不要把参数交给 shell**
+  //（Node 会为此发 DEP0190 弃用警告，且参数不会被转义）。
+  // 这里改用 `node <npm-cli.js> pack`，既跨平台又无需 shell。
+  const npmCli = process.env.npm_execpath
+  if (npmCli) {
+    execFileSync(process.execPath, [npmCli, 'pack', '--pack-destination', tmp], { cwd: ROOT, stdio: 'ignore' })
+  } else {
+    execFileSync('npm', ['pack', '--pack-destination', tmp], { cwd: ROOT, stdio: 'ignore', shell: true })
+  }
   const tgz = execFileSync('node', ['-e', `const fs=require('fs');console.log(fs.readdirSync(${JSON.stringify(tmp)}).find(f=>f.endsWith('.tgz')))`], { encoding: 'utf8' }).trim()
   const list = execFileSync('tar', ['-tzf', join(tmp, tgz)], { encoding: 'utf8' })
   const bad = ['.design-ledger', 'DEVPLAN', 'node_modules', '.git/'].filter((b) => list.includes(b))

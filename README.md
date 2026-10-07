@@ -290,7 +290,10 @@ parameters: { type: 'object', properties: { rel: {...} } }
 必须先想办法从会话侧把工作区"学"过来。另外：**别把"面板能打开"当成"根是对的"** ——
 本机就是先修好客户端（面板能显示出路径了），才看清根依然是错的。
 
-### 改这个插件时的验证顺序（不必重启 DSH）
+### 改这个插件时的验证顺序（**本节供改代码的人看，使用者可跳过**）
+
+> 只想用插件的话，看到这里就够了 —— 直接跳到下面的「界面语言」或「设计文档的解析规则」。
+> 下面这些命令在本仓库开发时用，需要 Node；其中带 ⭐ 的探针需要本机装了 DSH（见目录结构后的说明）。
 
 ```powershell
 npm run verify                                                                                # 语法 + 单测 + 文档体检 + 客户端体检 + 契约自检（推荐，一条命令跑完）
@@ -456,16 +459,7 @@ git clone https://github.com/<owner>/dsh-design-ledger.git
 
 无需构建步骤：插件是纯 ESM 的 `.js`，客户端半区也是直接加载的经典脚本。
 
-## 发布自己的版本（维护者清单）
-
-1. `npm run verify` —— 语法 + 13 个单测 + 双语文档体检 + 契约自检，必须全绿。
-2. `node probe/reorder-crashes.mjs` —— README 的「崩溃 N」小节保持升序（改了文档后跑一次）。
-3. 更新 `CHANGELOG.md` 与 `package.json` 的 `version`。
-4. 填 `package.json` 的 `repository` / `homepage` / `bugs` / `author`（`npm run check:readme` 会提醒缺哪些）。
-5. `git add -A && git commit -m "..." && git tag vX.Y.Z && git push --follow-tags`。
-6. GitHub 上按 tag 建 Release，正文直接取 `CHANGELOG.md` 对应小节。
-   **注意**：第三方的 `@deepseek-ai/*` 包已发布到 npm，`peerDependencies` 会被正常解析；
-   `dsh-design-ledger` 本身若要发 npm，请先去掉 `"private": true`。
+> 要**发新版本**（打 tag、建 Release、附件 tarball）请见 [RELEASING.md](RELEASING.md) —— 那是维护者流程，与使用者无关，所以不放在这里。
 
 ## 验证状态（本机实测）
 
@@ -525,6 +519,7 @@ dsh-design-ledger/
 ├── .gitattributes              # 文本一律 LF 入库（Windows 开发，避免整文件换行 diff）
 ├── .gitignore                  # 忽略 .design-ledger/（插件落盘诊断）与 DEVPLAN/state.json
 ├── README.md / README.en.md    # 中文 / 英文文档（逐节对照）
+├── RELEASING.md                # 发版流程（只给维护者看，使用者可忽略）
 ├── lib/
 │   ├── index.js                # 宿主侧插件：6 个工具 + 3 条面板路由 + 注入段落
 │   ├── design-doc.js           # 设计文档扫描、标题分节、表格行抽取（纯逻辑，可单测）
