@@ -81,6 +81,13 @@ console.log('\n=== 2) 隐私体检：本机绝对路径 / 身份信息 ===')
 const TEXT_EXT = /\.(js|mjs|json|md|yml|yaml|txt)$/i
 
 /**
+ * 体检**不扫自己**：本文件里写着用于识别的正则与示例字符串（`C:\Users\<某人>\`、
+ * `sk-xxxx` 之类），扫自己会把检测规则本身报成泄漏 —— 那是纯假警报。
+ * 假警报多了就会被无视，所以这里显式跳过。
+ */
+const SELF = 'probe/publish-audit.mjs'
+
+/**
  * 判据的分寸（否则体检会长期误报，最后被无视）：
  *
  * **只把"真正的隐私风险"判为失败**：
@@ -111,7 +118,7 @@ let hard = 0
 let soft = 0
 const seenSoft = new Set()
 for (const rel of [...local].sort()) {
-  if (!TEXT_EXT.test(rel)) continue
+  if (!TEXT_EXT.test(rel) || rel === SELF) continue
   const lines = readFileSync(join(ROOT, rel), 'utf8').split(/\r?\n/)
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
@@ -140,7 +147,8 @@ console.log('\n=== 3) 隐私体检：密钥形态 ===')
 const SECRET_RE = /sk-[A-Za-z0-9]{16,}|ghp_[A-Za-z0-9]{20,}|github_pat_|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----/
 let secrets = 0
 for (const rel of [...local].sort()) {
-  if (!TEXT_EXT.test(rel)) continue
+  // 同样跳过自身：本文件里就有用于识别的密钥正则字面量。
+  if (!TEXT_EXT.test(rel) || rel === SELF) continue
   if (SECRET_RE.test(readFileSync(join(ROOT, rel), 'utf8'))) {
     secrets += 1
     console.log('  ⚠️  ' + rel)
