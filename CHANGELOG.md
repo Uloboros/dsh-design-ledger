@@ -49,4 +49,4 @@
 - **改完插件代码必须整应用重启**：宿主会缓存 ESM 模块，HMR 只更新一部分，不能据此判断结果。
 - 台账记录的是**实际开发**的功能，不是设计文档的清单：要动手做的功能才建节点。
 
-[0.1.0]: https://github.com/OWNER/dsh-design-ledger/releases/tag/v0.1.0
+[0.1.0]: https://github.com/Uloboros/dsh-design-ledger/releases/tag/v0.1.0

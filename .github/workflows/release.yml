@@ -1,0 +1,125 @@
+# 发版：构建可安装的 tarball 并创建 Release（含附件）。
+#
+# 为什么用手动触发（workflow_dispatch）而不是 push tag 触发：
+#   用 GITHUB_TOKEN 创建 Release 时，**该 Release 对应的 tag 不会再触发其它 workflow**
+#   （GitHub 为防止递归而设的限制）。若本 workflow 由 tag push 触发、又去建同名 tag 的
+#   Release，就会在同一 tag 上打转。改为手动触发后：
+#     · 脚本自己保证 tag 存在（没有就用 package.json 的 version 建一个，即"补建 tag"）
+#     · 再基于该 tag 构建 tarball 并创建 Release —— 语义清晰，没有任何循环。
+#
+# 用法：GitHub → Actions → Release → Run workflow（输入留空即为 package.json 里的当前版本）。
+#
+# 需要的权限：contents: write（创建 tag 与 Release）。用的是内置 GITHUB_TOKEN，
+# 不需要任何个人访问令牌。
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号，如 0.1.0（留空则取 package.json 的 version）'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build tarball and publish release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 发版前先跑零依赖校验：宁可发不出去，也不要发出一个坏包
+      - name: Verify (syntax / unit tests / docs / client UI)
+        run: npm run check && npm test && npm run check:readme && npm run check:client
+
+      - name: Resolve version
+        id: ver
+        run: |
+          V="${{ inputs.version }}"
+          if [ -z "$V" ]; then V="$(node -p "require('./package.json').version")"; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "tag=v$V" >> "$GITHUB_OUTPUT"
+          # package.json 与输入不一致时报错退出，避免发出版本号对不上的包
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$V" != "$PKG" ]; then
+            echo "::error::输入的版本 $V 与 package.json 的 $PKG 不一致；请先改 package.json 并提交"
+            exit 1
+          fi
+
+      # 若 tag 不存在则补建（指向当前 commit），保证 Release 有对应 tag
+      - name: Ensure tag exists
+        run: |
+          TAG="${{ steps.ver.outputs.tag }}"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "tag $TAG 已存在"
+          else
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+            echo "已补建 tag $TAG"
+          fi
+
+      - name: Build tarball (npm pack honours package.json "files")
+        id: pack
+        run: |
+          npm pack
+          TGZ="$(ls -1 *.tgz | head -n1)"
+          echo "tgz=$TGZ" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$TGZ" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          # 附件内容自检：绝不能夹带运行痕迹
+          tar -tzf "$TGZ" > /tmp/list.txt
+          for bad in '.design-ledger' 'DEVPLAN' 'node_modules' '.git/'; do
+            if grep -q "$bad" /tmp/list.txt; then
+              echo "::error::tarball 内出现不该有的路径：$bad"
+              exit 1
+            fi
+          done
+          echo "tarball 文件数：$(wc -l < /tmp/list.txt)"
+
+      - name: Extract release notes from CHANGELOG
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          # 取 "## [<version>]" 到下一个 "## [" 之间的内容，并去掉引用式链接定义行
+          awk -v ver="$V" '
+            $0 ~ "^## \\[" ver "\\]" {inside=1; next}
+            inside && /^## \[/ {exit}
+            inside {print}
+          ' CHANGELOG.md | grep -v '^\[.*\]: http' > /tmp/notes.md
+          if [ ! -s /tmp/notes.md ]; then echo "（CHANGELOG 中没有 $V 的小节）" > /tmp/notes.md; fi
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "### 安装 / Install"
+            echo ""
+            echo '下载下方 `dsh-design-ledger-*.tgz`，解压后把路径交给 DSH：'
+            echo ""
+            echo '```'
+            echo 'plugin_manager  install_bundle  target = link:<解压后的绝对路径>'
+            echo '```'
+            echo ""
+            echo '并把 `dsh-design-ledger` 加入 profile 的 `dsh.profile.bundles`，然后重启桌面客户端。'
+            echo ""
+            echo "本版附件校验（SHA-256）：\`${{ steps.pack.outputs.sha256 }}\`"
+          } >> /tmp/notes.md
+          echo "发布正文行数：$(wc -l < /tmp/notes.md)"
+
+      - name: Create release with tarball asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" \
+            "${{ steps.pack.outputs.tgz }}" \
+            --title "v${{ steps.ver.outputs.version }}" \
+            --notes-file /tmp/notes.md \
+            --verify-tag
