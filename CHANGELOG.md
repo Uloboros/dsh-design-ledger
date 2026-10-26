@@ -3,6 +3,30 @@
 本文件记录对外可见的变更。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.1.2] - 2026-10-26
+
+诊断通道修复。**没有功能变更**——工具、面板、注入的行为都不变，改的只是"出问题时能不能看见原因"。
+
+### 修正 Fixed
+
+- **诊断日志静默丢弃**：`apply()` 阶段还没有 session，`sandboxPolicy.resolve()` 只能给出 profile
+  目录（被 `isDeploymentRoot` 拒绝），首选路径于是退化成 `process.cwd()`（应用安装目录），
+  `mkdirSync` / `writeFileSync` 失败后被 `catch {}` 全部吞掉。表现为"插件明明是 active、
+  `diag.log` 却一行都不长"，极易被误读成"代码没跑到"。现在按
+  `<工作区>/.design-ledger` → `<系统临时目录>/dsh-design-ledger` 的顺序尝试，
+  两条都写不进去时用 `console.warn` 报**一次**。
+- **诊断目录不跟随实际工作区**：学到会话工作区后把诊断目录切回 `<工作区>/.design-ledger`，
+  不再停留在临时目录（排查时不会找错地方）。
+- **自检探针形同虚设**：`diagVerifyChannel()` 原先在诊断目录配置**之前**被调用，永远写不出标记，
+  等于白跑；现改为目录配置完成后再自检一次。
+
+### 验证 Verified
+
+- `node --check` 全过；单元测试 10/10；`probe/contract-test.mjs` 全通过；`probe/host-smoke.mjs`
+  用真实设计文档端到端（建台账 → 状态 → 更新 → 注入文本 → 读 bug → 按需读文档）通过。
+- 与 DSH `0.2.1-rc.3` 实测通过：6 个工具注册、3 条路由、侧栏与主面板槽位、`agent/created`
+  事件、`systemPrompt` 注入段落（846 字符）均正常。
+
 ## [0.1.1] - 2026-10-07
 
 文档整理与元数据修正。**没有功能变更**，但有一处会实际影响安装的声明修正。
@@ -77,5 +101,6 @@
 - **改完插件代码必须整应用重启**：宿主会缓存 ESM 模块，HMR 只更新一部分，不能据此判断结果。
 - 台账记录的是**实际开发**的功能，不是设计文档的清单：要动手做的功能才建节点。
 
+[0.1.2]: https://github.com/Uloboros/dsh-design-ledger/releases/tag/v0.1.2
 [0.1.1]: https://github.com/Uloboros/dsh-design-ledger/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Uloboros/dsh-design-ledger/releases/tag/v0.1.0

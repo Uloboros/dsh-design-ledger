@@ -1,6 +1,6 @@
 {
   "name": "dsh-design-ledger",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "把设计文档变成可实时更新的开发进度树，并分层注入 DSH 会话上下文，使新会话在大项目上下文耗尽后仍能接上进度。",
   "type": "module",
